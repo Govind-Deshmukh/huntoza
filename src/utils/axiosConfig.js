@@ -21,6 +21,20 @@ export const setAuthToken = (token) => {
 
 // Setup interceptor for handling token expiration
 let refreshPromise = null;
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+
+  failedQueue = [];
+};
 
 axiosInstance.interceptors.response.use(
   (response) => response,
@@ -31,35 +45,59 @@ axiosInstance.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      localStorage.getItem("token")
+      localStorage.getItem("token") &&
+      !originalRequest.url.includes("/auth/refresh-token") // Prevent refresh-token endpoint from triggering another refresh
     ) {
+      if (isRefreshing) {
+        // If already refreshing, queue the request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers["Authorization"] = `Bearer ${token}`;
+            return axiosInstance(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
-        // Avoid multiple refresh requests
-        if (!refreshPromise) {
-          refreshPromise = axiosInstance
-            .post("/auth/refresh-token")
-            .then((res) => res.data.token)
-            .finally(() => {
-              refreshPromise = null;
-            });
-        }
+        // Try to refresh the token
+        const response = await axiosInstance.post("/auth/refresh-token", {
+          refreshToken: localStorage.getItem("refreshToken"),
+        });
 
-        const newToken = await refreshPromise;
+        const newToken = response.data.token;
 
         if (newToken) {
           // Set the new token
           setAuthToken(newToken);
 
-          // Retry the original request with new token
+          // Update authorization header for the original request
           originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+
+          // Process all queued requests with the new token
+          processQueue(null, newToken);
+
+          // Return the original request with the new token
           return axiosInstance(originalRequest);
         }
       } catch (refreshError) {
+        // Process the queue with an error
+        processQueue(refreshError, null);
+
         // If refresh token fails, clear tokens and redirect to login
         setAuthToken(null);
+        localStorage.removeItem("refreshToken");
+
+        // Throw the refresh error for proper handling
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
 

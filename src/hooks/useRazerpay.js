@@ -14,6 +14,12 @@ const useRazorpay = () => {
    */
   const loadRazorpayScript = useCallback(() => {
     return new Promise((resolve, reject) => {
+      // Check if Razorpay is already loaded
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+
       const script = document.createElement("script");
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
       script.async = true;
@@ -35,51 +41,6 @@ const useRazorpay = () => {
   }, []);
 
   /**
-   * Initialize and open Razorpay payment
-   * @param {Object} options - Razorpay payment options
-   * @returns {Promise} Promise that resolves after payment completion or rejection
-   */
-  const openRazorpayCheckout = useCallback(
-    async (options) => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        // Load Razorpay script if not already loaded
-        if (!window.Razorpay) {
-          await loadRazorpayScript();
-        }
-
-        return new Promise((resolve, reject) => {
-          const rzp = new window.Razorpay({
-            ...options,
-            handler: (response) => {
-              resolve(response);
-            },
-            modal: {
-              ondismiss: () => {
-                reject(new Error("Payment canceled by user"));
-              },
-            },
-          });
-
-          rzp.on("payment.failed", (resp) => {
-            reject(new Error(resp.error.description || "Payment failed"));
-          });
-
-          rzp.open();
-        });
-      } catch (err) {
-        setError(err.message || "Failed to initialize payment");
-        throw err;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [loadRazorpayScript]
-  );
-
-  /**
    * Process payment with Razorpay
    * @param {Object} paymentData - Payment details including order ID, amount, etc.
    * @param {Object} userData - User information for prefill
@@ -91,31 +52,61 @@ const useRazorpay = () => {
         throw new Error("Invalid payment data");
       }
 
-      const options = {
-        key: paymentData.keyId,
-        amount: paymentData.order.amount,
-        currency: paymentData.order.currency || "INR",
-        name: "Job Hunt Tracker",
-        description: "Plan Subscription",
-        order_id: paymentData.order.id,
-        prefill: {
-          name: userData?.name || "",
-          email: userData?.email || "",
-          contact: userData?.phone || "",
-        },
-        theme: {
-          color: "#3498db",
-        },
-      };
+      setIsLoading(true);
+      setError(null);
 
       try {
-        return await openRazorpayCheckout(options);
+        // Load Razorpay script if not already loaded
+        await loadRazorpayScript();
+
+        const options = {
+          key: paymentData.keyId,
+          amount: paymentData.order.amount,
+          currency: paymentData.order.currency || "INR",
+          name: "Job Hunt Tracker",
+          description: "Plan Subscription",
+          order_id: paymentData.order.id,
+          prefill: {
+            name: userData?.name || "",
+            email: userData?.email || "",
+            contact: userData?.phone || "",
+          },
+          theme: {
+            color: "#3498db",
+          },
+          // Only handle successful payments here
+          handler: function (response) {
+            // This will be replaced by the promise resolve
+          },
+        };
+
+        return new Promise((resolve, reject) => {
+          const razorpayInstance = new window.Razorpay({
+            ...options,
+            handler: (response) => {
+              resolve(response);
+            },
+            modal: {
+              ondismiss: () => {
+                reject(new Error("Payment canceled by user"));
+              },
+            },
+          });
+
+          razorpayInstance.on("payment.failed", (resp) => {
+            reject(new Error(resp.error.description || "Payment failed"));
+          });
+
+          razorpayInstance.open();
+        });
       } catch (err) {
         setError(err.message || "Payment processing failed");
         throw err;
+      } finally {
+        setIsLoading(false);
       }
     },
-    [openRazorpayCheckout]
+    [loadRazorpayScript]
   );
 
   return {

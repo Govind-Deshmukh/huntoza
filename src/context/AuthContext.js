@@ -1,4 +1,10 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+} from "react";
 import * as authService from "../services/authService";
 import { setAuthToken } from "../utils/axiosConfig";
 
@@ -10,37 +16,41 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Check for token and load user on mount
-  useEffect(() => {
-    const loadUserFromToken = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          setIsLoading(false);
-          return;
-        }
+  // Clear error
+  const clearError = useCallback(() => setError(null), []);
 
-        // Set auth token header
-        setAuthToken(token);
-
-        // Load user data
-        const userData = await authService.getCurrentUser();
-        setUser(userData);
-        setIsAuthenticated(true);
-      } catch (err) {
-        // Token might be invalid, clear it
-        setAuthToken(null);
-        console.error("Error loading user:", err);
-      } finally {
+  // Load user from token
+  const loadUserFromToken = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
         setIsLoading(false);
+        return;
       }
-    };
 
-    loadUserFromToken();
+      // Set auth token header
+      setAuthToken(token);
+
+      // Load user data
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
+      setIsAuthenticated(true);
+    } catch (err) {
+      // Token might be invalid, clear it
+      setAuthToken(null);
+      console.error("Error loading user:", err);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
+  // Check for token and load user on mount
+  useEffect(() => {
+    loadUserFromToken();
+  }, [loadUserFromToken]);
+
   // Register user
-  const register = async (userData) => {
+  const register = useCallback(async (userData) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -55,15 +65,21 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Login user
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     try {
       setIsLoading(true);
       setError(null);
 
       const data = await authService.login(email, password);
+
+      // Store refresh token in localStorage if it's returned
+      if (data.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
+
       setUser(data.user);
       setIsAuthenticated(true);
       return data;
@@ -73,10 +89,10 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Logout user
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       setIsLoading(true);
       await authService.logout();
@@ -86,11 +102,12 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       setIsLoading(false);
+      localStorage.removeItem("refreshToken");
     }
-  };
+  }, []);
 
   // Forgot password
-  const forgotPassword = async (email) => {
+  const forgotPassword = useCallback(async (email) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -101,10 +118,10 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Reset password
-  const resetPassword = async (token, password) => {
+  const resetPassword = useCallback(async (token, password) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -113,6 +130,11 @@ export const AuthProvider = ({ children }) => {
 
       // If token is returned, user is automatically logged in
       if (data.token) {
+        // Store refresh token in localStorage if it's returned
+        if (data.refreshToken) {
+          localStorage.setItem("refreshToken", data.refreshToken);
+        }
+
         // Get updated user profile
         const userData = await authService.getCurrentUser();
         setUser(userData);
@@ -126,10 +148,10 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Check reset token validity
-  const checkResetToken = async (token) => {
+  const checkResetToken = useCallback(async (token) => {
     try {
       setIsLoading(true);
       return await authService.checkResetToken(token);
@@ -138,10 +160,10 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Update user profile
-  const updateProfile = async (profileData) => {
+  const updateProfile = useCallback(async (profileData) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -156,25 +178,63 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Update password
-  const updatePassword = async (currentPassword, newPassword) => {
+  const updatePassword = useCallback(async (currentPassword, newPassword) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      return await authService.updatePassword(currentPassword, newPassword);
+      const data = await authService.updatePassword(
+        currentPassword,
+        newPassword
+      );
+
+      // Store refresh token in localStorage if it's returned
+      if (data.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
+
+      return data;
     } catch (err) {
       setError(err.response?.data?.message || "Failed to update password");
       throw err;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  // Clear error
-  const clearError = () => setError(null);
+  // Refresh user token
+  const refreshToken = useCallback(async () => {
+    try {
+      const refreshTokenValue = localStorage.getItem("refreshToken");
+      if (!refreshTokenValue) {
+        throw new Error("No refresh token found");
+      }
+
+      const data = await authService.refreshToken(refreshTokenValue);
+
+      if (data.token) {
+        setAuthToken(data.token);
+        // If new refreshToken is returned, update it
+        if (data.refreshToken) {
+          localStorage.setItem("refreshToken", data.refreshToken);
+        }
+        return data.token;
+      }
+
+      throw new Error("Failed to refresh token");
+    } catch (err) {
+      console.error("Token refresh error:", err);
+      // Clear auth on refresh failure
+      setAuthToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem("refreshToken");
+      throw err;
+    }
+  }, []);
 
   // Context value
   const contextValue = {
@@ -191,6 +251,8 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     updatePassword,
     clearError,
+    refreshToken,
+    loadUserFromToken,
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, { createContext, useState, useCallback, useContext } from "react";
 import api, { setAuthToken } from "../utils/axiosConfig";
 import { useAuth } from "./AuthContext";
 
@@ -6,7 +6,7 @@ import { useAuth } from "./AuthContext";
 const DataContext = createContext();
 
 export const DataProvider = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, refreshToken } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -82,25 +82,26 @@ export const DataProvider = ({ children }) => {
     }
   };
 
-  // Load plans
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     try {
       setIsLoading(true);
       clearError();
 
       const response = await api.get("/plans");
       setPlans(response.data.plans);
+      return response.data.plans;
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load plans");
       console.error("Load plans error:", err);
+      return [];
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [clearError]);
 
   // Load current plan
-  const loadCurrentPlan = async () => {
-    if (!isAuthenticated) return;
+  const loadCurrentPlan = useCallback(async () => {
+    if (!isAuthenticated) return null;
 
     try {
       setIsLoading(true);
@@ -108,13 +109,15 @@ export const DataProvider = ({ children }) => {
 
       const response = await api.get("/plans/user/current");
       setCurrentPlan(response.data);
+      return response.data;
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load current plan");
       console.error("Load current plan error:", err);
+      return null;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isAuthenticated, clearError]);
 
   // === JOBS OPERATIONS ===
 
@@ -629,52 +632,88 @@ export const DataProvider = ({ children }) => {
   };
 
   // Create payment order
-  const createPaymentOrder = async (planId, billingType) => {
-    if (!isAuthenticated) return null;
+  const createPaymentOrder = useCallback(
+    async (planId, billingType) => {
+      if (!isAuthenticated) return null;
 
-    try {
-      setIsLoading(true);
-      clearError();
+      try {
+        setIsLoading(true);
+        clearError();
 
-      const response = await api.post("/payments/create-order", {
-        planId,
-        billingType,
-      });
-      return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to create payment order");
-      console.error("Create payment order error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        const response = await api.post("/payments/create-order", {
+          planId,
+          billingType,
+        });
+        return response.data;
+      } catch (err) {
+        // Try to refresh token if 401 error
+        if (err.response?.status === 401) {
+          try {
+            await refreshToken();
+            // Retry the request after refresh
+            const response = await api.post("/payments/create-order", {
+              planId,
+              billingType,
+            });
+            return response.data;
+          } catch (refreshErr) {
+            setError("Your session has expired. Please log in again.");
+            throw refreshErr;
+          }
+        } else {
+          setError(
+            err.response?.data?.message || "Failed to create payment order"
+          );
+          throw err;
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, refreshToken]
+  );
 
   // Verify payment
-  const verifyPayment = async (paymentData) => {
-    if (!isAuthenticated) return null;
+  const verifyPayment = useCallback(
+    async (paymentData) => {
+      if (!isAuthenticated) return null;
 
-    try {
-      setIsLoading(true);
-      clearError();
+      try {
+        setIsLoading(true);
+        clearError();
 
-      const response = await api.post("/payments/verify", paymentData);
+        const response = await api.post("/payments/verify", paymentData);
 
-      // Refresh current plan after successful payment
-      await loadCurrentPlan();
+        // Refresh current plan after successful payment
+        await loadCurrentPlan();
 
-      return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to verify payment");
-      console.error("Verify payment error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        return response.data;
+      } catch (err) {
+        // Try to refresh token if 401 error
+        if (err.response?.status === 401) {
+          try {
+            await refreshToken();
+            // Retry the request after refresh
+            const response = await api.post("/payments/verify", paymentData);
+            await loadCurrentPlan();
+            return response.data;
+          } catch (refreshErr) {
+            setError("Your session has expired. Please log in again.");
+            throw refreshErr;
+          }
+        } else {
+          setError(err.response?.data?.message || "Failed to verify payment");
+          throw err;
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, loadCurrentPlan, refreshToken]
+  );
 
   // Get payment history
-  const getPaymentHistory = async () => {
+  const getPaymentHistory = useCallback(async () => {
     if (!isAuthenticated) return [];
 
     try {
@@ -684,16 +723,30 @@ export const DataProvider = ({ children }) => {
       const response = await api.get("/payments/history");
       return response.data.transactions;
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load payment history");
-      console.error("Payment history error:", err);
-      return [];
+      // Try to refresh token if 401 error
+      if (err.response?.status === 401) {
+        try {
+          await refreshToken();
+          // Retry the request after refresh
+          const response = await api.get("/payments/history");
+          return response.data.transactions;
+        } catch (refreshErr) {
+          setError("Your session has expired. Please log in again.");
+          return [];
+        }
+      } else {
+        setError(
+          err.response?.data?.message || "Failed to load payment history"
+        );
+        return [];
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isAuthenticated, clearError, refreshToken]);
 
   // Cancel subscription
-  const cancelSubscription = async () => {
+  const cancelSubscription = useCallback(async () => {
     if (!isAuthenticated) return false;
 
     try {
@@ -707,13 +760,28 @@ export const DataProvider = ({ children }) => {
 
       return true;
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to cancel subscription");
-      console.error("Cancel subscription error:", err);
-      return false;
+      // Try to refresh token if 401 error
+      if (err.response?.status === 401) {
+        try {
+          await refreshToken();
+          // Retry the request after refresh
+          await api.post("/plans/cancel");
+          await loadCurrentPlan();
+          return true;
+        } catch (refreshErr) {
+          setError("Your session has expired. Please log in again.");
+          throw refreshErr;
+        }
+      } else {
+        setError(
+          err.response?.data?.message || "Failed to cancel subscription"
+        );
+        throw err;
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isAuthenticated, clearError, loadCurrentPlan, refreshToken]);
 
   // Context value
   const contextValue = {

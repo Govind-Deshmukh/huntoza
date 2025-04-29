@@ -53,34 +53,8 @@ const getPaymentDetails = async (paymentId) => {
   }
 };
 
-// Generate Razorpay checkout options
-const generateCheckoutOptions = (order, userData) => {
-  return {
-    key: process.env.RAZORPAY_KEY_ID,
-    amount: order.amount,
-    currency: order.currency,
-    name: "Job Hunt Tracker",
-    description: "Plan Subscription",
-    order_id: order.id,
-    handler: function (response) {
-      // This will be handled by your frontend
-      console.log(response);
-    },
-    prefill: {
-      name: userData.name,
-      email: userData.email,
-      contact: userData.phone || "",
-    },
-    notes: order.notes,
-    theme: {
-      color: "#3399cc",
-    },
-  };
-};
-
 module.exports = {
   createOrder,
   verifyPaymentSignature,
   getPaymentDetails,
-  generateCheckoutOptions,
 };

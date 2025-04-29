@@ -43,14 +43,16 @@ export const getCurrentUser = async () => {
 };
 
 // Refresh token
-export const refreshToken = async () => {
-  const response = await api.post("/auth/refresh-token");
+export const refreshToken = async (refreshTokenValue) => {
+  const response = await api.post("/auth/refresh-token", {
+    refreshToken: refreshTokenValue,
+  });
 
   if (response.data.token) {
     setAuthToken(response.data.token);
   }
 
-  return response.data.token;
+  return response.data;
 };
 
 // Forgot password

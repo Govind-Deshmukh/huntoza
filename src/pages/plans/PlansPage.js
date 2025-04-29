@@ -1,90 +1,97 @@
 import React, { useState, useEffect } from "react";
-import { useData } from "../../context/DataContext";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useData } from "../../context/DataContext";
+import useRazorpay from "../../hooks/useRazerpay";
 
-const PlansPage = () => {
+const PaymentPage = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const {
-    plans,
-    loadPlans,
-    isLoading,
-    error,
-    currentPlan,
-    loadCurrentPlan,
     createPaymentOrder,
     verifyPayment,
+    isLoading: dataLoading,
+    error: dataError,
   } = useData();
+  const {
+    processPayment,
+    isLoading: razorpayLoading,
+    error: razorpayError,
+    clearError,
+  } = useRazorpay();
 
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [billingType, setBillingType] = useState("monthly");
+  const [paymentData, setPaymentData] = useState(null);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
-  const [paymentError, setPaymentError] = useState(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [initError, setInitError] = useState(null);
 
-  const navigate = useNavigate();
+  // Get plan and billing info from location state
+  const { planId, billingType } = location.state || {};
 
-  // Load plans on component mount
+  // Error handling
+  const error = dataError || razorpayError || initError;
+  const isLoading = dataLoading || razorpayLoading;
+
   useEffect(() => {
-    loadPlans();
-    loadCurrentPlan();
-  }, [loadPlans, loadCurrentPlan]);
+    // Redirect if no plan data
+    if (!planId || !billingType) {
+      navigate("/plans");
+      return;
+    }
 
-  const handlePlanSelect = (plan) => {
-    setSelectedPlan(plan);
-  };
+    const initializePayment = async () => {
+      try {
+        setPaymentProcessing(true);
+        clearError();
+        setInitError(null);
 
-  const handleBillingTypeChange = (e) => {
-    setBillingType(e.target.value);
-  };
+        // Create payment order
+        const orderData = await createPaymentOrder(planId, billingType);
+        if (!orderData || !orderData.order || !orderData.keyId) {
+          throw new Error("Invalid order data received from server");
+        }
 
-  const initializePayment = async () => {
-    if (!selectedPlan) return;
+        setPaymentData(orderData);
+      } catch (err) {
+        console.error("Payment initialization error:", err);
+        setInitError(err.message || "Failed to initialize payment");
+      } finally {
+        setPaymentProcessing(false);
+      }
+    };
+
+    initializePayment();
+  }, [planId, billingType, createPaymentOrder, navigate, clearError]);
+
+  const handlePayment = async () => {
+    if (!paymentData) return;
 
     try {
       setPaymentProcessing(true);
-      setPaymentError(null);
+      clearError();
+      setInitError(null);
 
-      // Create payment order
-      const orderData = await createPaymentOrder(selectedPlan._id, billingType);
+      // Process payment with Razorpay
+      const response = await processPayment(paymentData, {
+        name: user?.name || "",
+        email: user?.email || "",
+      });
 
-      if (orderData) {
-        // Initialize Razorpay checkout
-        const options = {
-          key: orderData.keyId,
-          amount: orderData.order.amount,
-          currency: orderData.order.currency,
-          name: "Job Hunt Tracker",
-          description: `${selectedPlan.name} Plan (${billingType})`,
-          order_id: orderData.order.id,
-          prefill: {
-            name: user.name,
-            email: user.email,
-          },
-          handler: function (response) {
-            handlePaymentSuccess(response, orderData.transaction);
-          },
-          modal: {
-            ondismiss: function () {
-              setPaymentProcessing(false);
-            },
-          },
-          theme: {
-            color: "#3498db",
-          },
-        };
-
-        // Load Razorpay script and open checkout
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.async = true;
-        script.onload = () => {
-          const rzp = new window.Razorpay(options);
-          rzp.open();
-        };
-        document.body.appendChild(script);
+      if (
+        !response ||
+        !response.razorpay_payment_id ||
+        !response.razorpay_order_id ||
+        !response.razorpay_signature
+      ) {
+        throw new Error("Invalid payment response received");
       }
+
+      // Handle payment success
+      await handlePaymentSuccess(response, paymentData.transaction);
     } catch (err) {
-      setPaymentError(err.message || "Failed to process payment");
+      console.error("Payment failed:", err);
+      setInitError(err.message || "Payment processing failed");
       setPaymentProcessing(false);
     }
   };
@@ -99,267 +106,187 @@ const PlansPage = () => {
         transactionId: transactionId,
       };
 
-      // Using verifyPayment from the useData hook that was already declared at the top level
       await verifyPayment(verificationData);
 
-      // Refresh current plan data
-      await loadCurrentPlan();
+      // Show success message
+      setPaymentSuccess(true);
 
-      // Redirect to dashboard with success message
-      navigate("/dashboard", {
-        state: {
-          message: "Payment successful! Your plan has been upgraded.",
-          type: "success",
-        },
-      });
+      // Redirect to dashboard after a delay
+      setTimeout(() => {
+        navigate("/dashboard", {
+          state: {
+            message: "Payment successful! Your plan has been upgraded.",
+            type: "success",
+          },
+        });
+      }, 3000);
     } catch (err) {
-      setPaymentError(err.message || "Payment verification failed");
+      console.error("Payment verification failed:", err);
+      setInitError(err.message || "Payment verification failed");
+    } finally {
       setPaymentProcessing(false);
     }
   };
 
-  const getPlanPrice = (plan) => {
-    if (!plan || !plan.price) return "";
-    return billingType === "monthly"
-      ? `₹${plan.price.monthly}/month`
-      : `₹${plan.price.yearly}/year (Save ${calculateYearlySavings(plan)}%)`;
+  const handleCancel = () => {
+    navigate("/plans");
   };
-
-  const calculateYearlySavings = (plan) => {
-    if (!plan || !plan.price) return 0;
-    const monthlyTotal = plan.price.monthly * 12;
-    const yearlyCost = plan.price.yearly;
-    return Math.round(((monthlyTotal - yearlyCost) / monthlyTotal) * 100);
-  };
-
-  const isPlanActive = (plan) => {
-    return currentPlan && currentPlan.plan && currentPlan.plan._id === plan._id;
-  };
-
-  // If loading, show spinner
-  if (isLoading && !plans.length) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-            Choose Your Plan
-          </h1>
-          <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-            Select the plan that best fits your job search needs
-          </p>
-        </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <h2 className="text-center text-3xl font-extrabold text-gray-900">
+          {paymentSuccess ? "Payment Successful" : "Complete Payment"}
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          {paymentSuccess
+            ? "Your plan has been upgraded successfully"
+            : "Complete your payment to activate your subscription"}
+        </p>
+      </div>
 
-        {/* Billing toggle */}
-        <div className="flex justify-center mb-8">
-          <div className="relative flex items-center">
-            <div className="flex items-center">
-              <input
-                type="radio"
-                id="monthly"
-                name="billing-type"
-                value="monthly"
-                checked={billingType === "monthly"}
-                onChange={handleBillingTypeChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-              />
-              <label htmlFor="monthly" className="ml-2 text-gray-700">
-                Monthly
-              </label>
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {isLoading || paymentProcessing ? (
+            <div className="flex flex-col items-center justify-center py-6">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-gray-700">
+                {paymentProcessing
+                  ? "Processing your payment..."
+                  : "Initializing payment..."}
+              </p>
             </div>
-            <div className="flex items-center ml-6">
-              <input
-                type="radio"
-                id="yearly"
-                name="billing-type"
-                value="yearly"
-                checked={billingType === "yearly"}
-                onChange={handleBillingTypeChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-              />
-              <label htmlFor="yearly" className="ml-2 text-gray-700">
-                Yearly <span className="text-green-600">(Save up to 20%)</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-8 max-w-md mx-auto bg-red-50 p-4 rounded-md text-red-700">
-            {error}
-          </div>
-        )}
-
-        {paymentError && (
-          <div className="mb-8 max-w-md mx-auto bg-red-50 p-4 rounded-md text-red-700">
-            {paymentError}
-          </div>
-        )}
-
-        {/* Plan cards */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {plans.map((plan) => (
-            <div
-              key={plan._id}
-              className={`bg-white rounded-lg shadow-md overflow-hidden ${
-                selectedPlan && selectedPlan._id === plan._id
-                  ? "ring-2 ring-blue-500"
-                  : ""
-              }`}
-            >
-              {/* Plan header */}
-              <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {plan.name.charAt(0).toUpperCase() + plan.name.slice(1)}
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">{plan.description}</p>
-              </div>
-
-              {/* Plan price */}
-              <div className="px-6 pt-4 pb-2">
-                <div className="text-3xl font-bold text-gray-900">
-                  {plan.name === "free" ? "Free" : getPlanPrice(plan)}
-                </div>
-                {isPlanActive(plan) && (
-                  <span className="inline-block mt-2 px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">
-                    Current Plan
-                  </span>
-                )}
-              </div>
-
-              {/* Plan features */}
-              <div className="px-6 py-4">
-                <ul className="mt-4 space-y-4">
-                  {plan.features.map((feature, i) => (
-                    <li key={i} className="flex items-start">
-                      <svg
-                        className={`flex-shrink-0 h-5 w-5 ${
-                          feature.included ? "text-green-500" : "text-gray-400"
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        {feature.included ? (
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M5 13l4 4L19 7"
-                          ></path>
-                        ) : (
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M6 18L18 6M6 6l12 12"
-                          ></path>
-                        )}
-                      </svg>
-                      <span className="ml-2 text-sm text-gray-600">
-                        {feature.name}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Plan limits */}
-              <div className="px-6 py-4 border-t border-gray-200">
-                <h4 className="text-sm font-medium text-gray-900">
-                  Plan Limits
-                </h4>
-                <ul className="mt-2 space-y-2">
-                  <li className="flex justify-between text-sm">
-                    <span className="text-gray-600">Job Applications</span>
-                    <span className="font-medium">
-                      {plan.limits.jobApplications === -1
-                        ? "Unlimited"
-                        : plan.limits.jobApplications}
-                    </span>
-                  </li>
-                  <li className="flex justify-between text-sm">
-                    <span className="text-gray-600">Contacts</span>
-                    <span className="font-medium">
-                      {plan.limits.contacts === -1
-                        ? "Unlimited"
-                        : plan.limits.contacts}
-                    </span>
-                  </li>
-                  <li className="flex justify-between text-sm">
-                    <span className="text-gray-600">Document Storage</span>
-                    <span className="font-medium">
-                      {plan.limits.documentStorage === -1
-                        ? "Unlimited"
-                        : `${plan.limits.documentStorage} MB`}
-                    </span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Action button */}
-              <div className="px-6 py-4 border-t border-gray-200">
-                <button
-                  onClick={() => handlePlanSelect(plan)}
-                  disabled={isPlanActive(plan) || paymentProcessing}
-                  className={`w-full px-4 py-2 text-sm font-medium rounded-md ${
-                    isPlanActive(plan)
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  }`}
+          ) : paymentSuccess ? (
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                <svg
+                  className="h-6 w-6 text-green-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  {isPlanActive(plan)
-                    ? "Current Plan"
-                    : plan.name === "free"
-                    ? "Select Free Plan"
-                    : "Select Plan"}
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M5 13l4 4L19 7"
+                  ></path>
+                </svg>
+              </div>
+              <h3 className="mt-3 text-lg font-medium text-gray-900">
+                Payment Successful
+              </h3>
+              <p className="mt-2 text-sm text-gray-500">
+                Thank you for your payment. Your subscription has been
+                activated.
+              </p>
+              <div className="mt-5">
+                <p className="text-sm text-gray-500">
+                  Redirecting to dashboard...
+                </p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg
+                  className="h-6 w-6 text-red-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  ></path>
+                </svg>
+              </div>
+              <h3 className="mt-3 text-lg font-medium text-gray-900">
+                Payment Failed
+              </h3>
+              <p className="mt-2 text-sm text-red-600">{error}</p>
+              <div className="mt-5 flex justify-center space-x-3">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={handleCancel}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Cancel
                 </button>
               </div>
             </div>
-          ))}
+          ) : !paymentData ? (
+            <div className="text-center py-6">
+              <p className="text-gray-700">Preparing payment details...</p>
+            </div>
+          ) : (
+            <div className="text-center">
+              <p className="text-gray-700 mb-4">
+                Please click the button below to proceed with your payment.
+              </p>
+              <button
+                onClick={handlePayment}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Pay Now
+              </button>
+              <button
+                onClick={handleCancel}
+                className="mt-3 w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Selected plan action */}
-        {selectedPlan && (
-          <div className="mt-12 text-center">
-            <h2 className="text-lg font-medium text-gray-900">
-              You've selected the{" "}
-              {selectedPlan.name.charAt(0).toUpperCase() +
-                selectedPlan.name.slice(1)}{" "}
-              Plan
-            </h2>
-            <p className="mt-2 text-gray-600">
-              {selectedPlan.name === "free"
-                ? "The Free plan includes basic features to help you get started with your job hunt."
-                : `You'll be charged ${
-                    billingType === "monthly"
-                      ? `₹${selectedPlan.price.monthly} per month`
-                      : `₹${selectedPlan.price.yearly} per year`
-                  }.`}
-            </p>
-            <button
-              onClick={
-                selectedPlan.name === "free"
-                  ? () => navigate("/dashboard")
-                  : initializePayment
-              }
-              disabled={paymentProcessing}
-              className="mt-4 px-6 py-3 text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
-            >
-              {paymentProcessing
-                ? "Processing..."
-                : selectedPlan.name === "free"
-                ? "Confirm Free Plan"
-                : "Proceed to Payment"}
-            </button>
+        {/* Order Summary */}
+        {paymentData && !paymentSuccess && !isLoading && !paymentProcessing && (
+          <div className="mt-4 bg-white py-6 px-4 shadow sm:rounded-lg sm:px-10">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Order Summary
+            </h3>
+            <div className="border-t border-gray-200 pt-4">
+              <dl className="divide-y divide-gray-200">
+                <div className="py-2 flex justify-between">
+                  <dt className="text-sm font-medium text-gray-500">Plan</dt>
+                  <dd className="text-sm font-medium text-gray-900">
+                    {paymentData.order.notes?.planName
+                      ? paymentData.order.notes.planName
+                          .charAt(0)
+                          .toUpperCase() +
+                        paymentData.order.notes.planName.slice(1) +
+                        " Plan"
+                      : "Subscription"}
+                  </dd>
+                </div>
+                <div className="py-2 flex justify-between">
+                  <dt className="text-sm font-medium text-gray-500">Billing</dt>
+                  <dd className="text-sm font-medium text-gray-900 capitalize">
+                    {paymentData.order.notes?.billingType || billingType}
+                  </dd>
+                </div>
+                <div className="py-2 flex justify-between">
+                  <dt className="text-sm font-medium text-gray-500">Amount</dt>
+                  <dd className="text-sm font-medium text-gray-900">
+                    {new Intl.NumberFormat("en-IN", {
+                      style: "currency",
+                      currency: paymentData.order.currency || "INR",
+                      minimumFractionDigits: 0,
+                    }).format(paymentData.order.amount / 100)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
           </div>
         )}
       </div>
@@ -367,4 +294,4 @@ const PlansPage = () => {
   );
 };
 
-export default PlansPage;
+export default PaymentPage;
