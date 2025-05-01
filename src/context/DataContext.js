@@ -783,6 +783,74 @@ export const DataProvider = ({ children }) => {
     }
   }, [isAuthenticated, clearError, loadCurrentPlan, refreshToken]);
 
+  // Add interaction to contact
+  const addInteraction = async (contactId, interactionData) => {
+    if (!isAuthenticated) return null;
+
+    try {
+      setIsLoading(true);
+      clearError();
+
+      const response = await api.post(
+        `/contacts/${contactId}/interactions`,
+        interactionData
+      );
+      return response.data.contact;
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to add interaction");
+      console.error("Add interaction error:", err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update interaction
+  const updateInteraction = async (
+    contactId,
+    interactionId,
+    interactionData
+  ) => {
+    if (!isAuthenticated) return null;
+
+    try {
+      setIsLoading(true);
+      clearError();
+
+      const response = await api.patch(
+        `/contacts/${contactId}/interactions/${interactionId}`,
+        interactionData
+      );
+      return response.data.contact;
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to update interaction");
+      console.error("Update interaction error:", err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Delete interaction
+  const deleteInteraction = async (contactId, interactionId) => {
+    if (!isAuthenticated) return null;
+
+    try {
+      setIsLoading(true);
+      clearError();
+
+      const response = await api.delete(
+        `/contacts/${contactId}/interactions/${interactionId}`
+      );
+      return response.data.contact;
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to delete interaction");
+      console.error("Delete interaction error:", err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // Context value
   const contextValue = {
     // State
@@ -829,6 +897,9 @@ export const DataProvider = ({ children }) => {
     updateContact,
     deleteContact,
     toggleContactFavorite,
+    addInteraction,
+    updateInteraction,
+    deleteInteraction,
 
     // Payment & Plans methods
     initiatePlanUpgrade,

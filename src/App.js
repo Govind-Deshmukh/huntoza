@@ -20,11 +20,27 @@ import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import ProfilePage from "./pages/dashboard/ProfilePage";
 
+// Job Related Pages
+import JobDetailsPage from "./pages/dashboard/JobDetailsPage";
+import InterviewFormPage from "./pages/dashboard/InterviewFormPage";
+
+// Task Related Pages
+import TasksPage from "./pages/dashboard/TasksPage";
+import TaskDetailsPage from "./pages/dashboard/TaskDetailsPage";
+import TaskFormPage from "./pages/dashboard/TaskFormPage";
+
+// Contact Related Pages
+import ContactPage from "./pages/dashboard/ContactPage";
+import ContactDetailsPage from "./pages/dashboard/ContactDetailsPage";
+import ContactFormPage from "./pages/dashboard/ContactFormPage";
+
 // Plan and Payment Pages
 import PlansPage from "./pages/plans/PlansPage";
 import PaymentPage from "./pages/plans/PaymentPage";
 import PaymentHistoryPage from "./pages/plans/PaymentHistoryPage";
 import SubscriptionPage from "./pages/plans/SubscriptionPage";
+import ApplicationsPage from "./pages/dashboard/ApplicationsPage";
+import JobFormPage from "./pages/dashboard/JobFormPage";
 
 function App() {
   return (
@@ -45,8 +61,38 @@ function App() {
 
               {/* Protected Routes */}
               <Route element={<ProtectedRoute />}>
+                {/* Dashboard */}
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+
+                {/* Jobs Routes */}
+                <Route path="/applications" element={<ApplicationsPage />} />
+                <Route path="/jobs/new" element={<JobFormPage />} />
+                <Route path="/jobs/edit/:id" element={<JobFormPage />} />
+                <Route path="/jobs/:id" element={<JobDetailsPage />} />
+                <Route
+                  path="/jobs/:jobId/interviews/new"
+                  element={<InterviewFormPage />}
+                />
+                <Route
+                  path="/jobs/:jobId/interviews/edit/:interviewId"
+                  element={<InterviewFormPage />}
+                />
+
+                {/* Tasks Routes */}
+                <Route path="/tasks" element={<TasksPage />} />
+                <Route path="/tasks/new" element={<TaskFormPage />} />
+                <Route path="/tasks/edit/:id" element={<TaskFormPage />} />
+                <Route path="/tasks/:id" element={<TaskDetailsPage />} />
+
+                {/* Contacts Routes */}
+                <Route path="/contacts" element={<ContactPage />} />
+                <Route path="/contacts/new" element={<ContactFormPage />} />
+                <Route
+                  path="/contacts/edit/:id"
+                  element={<ContactFormPage />}
+                />
+                <Route path="/contacts/:id" element={<ContactDetailsPage />} />
 
                 {/* Plan and Payment Routes */}
                 <Route path="/plans" element={<PlansPage />} />
@@ -56,8 +102,6 @@ function App() {
                   element={<PaymentHistoryPage />}
                 />
                 <Route path="/subscription" element={<SubscriptionPage />} />
-
-                {/* Add other protected routes here */}
               </Route>
 
               {/* Redirect to dashboard if authenticated, otherwise to login */}
