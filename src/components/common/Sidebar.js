@@ -130,6 +130,18 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     ));
   };
 
+  // Get plan name safely with fallback to "Free"
+  const getPlanName = () => {
+    // Check if user exists and has currentPlan and name properties
+    if (user?.currentPlan?.name) {
+      return (
+        user.currentPlan.name.charAt(0).toUpperCase() +
+        user.currentPlan.name.slice(1)
+      );
+    }
+    return "Free"; // Default to "Free" if no plan is available
+  };
+
   return (
     <>
       {/* Mobile sidebar backdrop */}
@@ -179,11 +191,13 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           <div className="px-4 py-4 border-b">
             <div className="flex items-center">
               <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-                {user.name.charAt(0).toUpperCase()}
+                {user.name ? user.name.charAt(0).toUpperCase() : "U"}
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-800">{user.name}</p>
-                <p className="text-xs text-gray-500">{user.email}</p>
+                <p className="text-sm font-medium text-gray-800">
+                  {user?.name || "User"}
+                </p>
+                <p className="text-xs text-gray-500">{user?.email || ""}</p>
               </div>
             </div>
           </div>
@@ -197,8 +211,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           {renderNavItems()}
         </nav>
 
-        {/* Plan info */}
-        {user?.currentPlan && (
+        {/* Plan info - Only show if user and currentPlan exist */}
+        {user && (
           <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
             <div className="bg-blue-50 p-3 rounded-md">
               <div className="flex items-center">
@@ -217,9 +231,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                   ></path>
                 </svg>
                 <span className="ml-2 text-sm font-medium text-blue-600">
-                  {user.currentPlan.name.charAt(0).toUpperCase() +
-                    user.currentPlan.name.slice(1)}{" "}
-                  Plan
+                  {getPlanName()} Plan
                 </span>
               </div>
               <div className="mt-1 text-xs text-blue-500">
