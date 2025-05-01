@@ -1,6 +1,14 @@
 import React, { createContext, useState, useCallback, useContext } from "react";
-import api, { setAuthToken } from "../utils/axiosConfig";
 import { useAuth } from "./AuthContext";
+import useCurrentPlan from "../hooks/useCurrentPlans";
+import {
+  jobService,
+  taskService,
+  contactService,
+  planService,
+  paymentService,
+  analyticsService,
+} from "../services";
 
 // Create context
 const DataContext = createContext();
@@ -53,43 +61,48 @@ export const DataProvider = ({ children }) => {
 
   // Plans state
   const [plans, setPlans] = useState([]);
-  const [currentPlan, setCurrentPlan] = useState(null);
+  // Use the safe current plan hook instead of state + useEffect
+  const currentPlan = useCurrentPlan(isAuthenticated);
 
   // Analytics state
   const [dashboardAnalytics, setDashboardAnalytics] = useState(null);
 
   // Clear error
-  const clearError = () => setError(null);
+  const clearError = useCallback(() => setError(null), []);
 
-  // Load dashboard data
-  const loadDashboardData = async () => {
+  // === DASHBOARD OPERATIONS ===
+  const loadDashboardData = useCallback(async () => {
     if (!isAuthenticated) return;
 
     try {
       setIsLoading(true);
       clearError();
 
-      const response = await api.get("/analytics/dashboard");
-      setDashboardAnalytics(response.data.data);
+      const data = await analyticsService.loadDashboardData();
+      setDashboardAnalytics(data);
 
       // Set job stats from analytics
-      setJobStats(response.data.data.applicationStats);
+      setJobStats(data.applicationStats);
+
+      return data;
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load dashboard data");
       console.error("Dashboard data error:", err);
+      return null;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isAuthenticated, clearError]);
 
+  // === PLANS OPERATIONS ===
   const loadPlans = useCallback(async () => {
     try {
       setIsLoading(true);
       clearError();
 
-      const response = await api.get("/plans");
-      setPlans(response.data.plans);
-      return response.data.plans;
+      const plansData = await planService.loadPlans();
+      setPlans(plansData);
+      return plansData;
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load plans");
       console.error("Load plans error:", err);
@@ -99,537 +112,716 @@ export const DataProvider = ({ children }) => {
     }
   }, [clearError]);
 
-  // Load current plan
+  // Use the refreshPlan method from our hook
   const loadCurrentPlan = useCallback(async () => {
     if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.get("/plans/user/current");
-      setCurrentPlan(response.data);
-      return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load current plan");
-      console.error("Load current plan error:", err);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isAuthenticated, clearError]);
+    await currentPlan.refreshPlan();
+    return currentPlan;
+  }, [isAuthenticated, currentPlan]);
 
   // === JOBS OPERATIONS ===
+  const loadJobs = useCallback(
+    async (filters = {}, page = 1, limit = 10) => {
+      if (!isAuthenticated) return;
 
-  // Load jobs with optional filters
-  const loadJobs = async (filters = {}, page = 1, limit = 10) => {
-    if (!isAuthenticated) return;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
+        const data = await jobService.loadJobs(filters, page, limit);
 
-      const queryParams = new URLSearchParams({
-        page,
-        limit,
-        ...filters,
-      });
+        setJobs(data.jobs);
+        setJobsPagination({
+          currentPage: data.currentPage,
+          totalPages: data.numOfPages,
+          totalItems: data.totalJobs,
+        });
 
-      const response = await api.get(`/jobs?${queryParams}`);
-
-      setJobs(response.data.jobs);
-      setJobsPagination({
-        currentPage: response.data.currentPage,
-        totalPages: response.data.numOfPages,
-        totalItems: response.data.totalJobs,
-      });
-
-      return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load jobs");
-      console.error("Load jobs error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Get job by ID
-  const getJobById = async (jobId) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.get(`/jobs/${jobId}`);
-      return response.data.job;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load job details");
-      console.error("Get job error:", err);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Create job
-  const createJob = async (jobData) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.post("/jobs", jobData);
-
-      // Update jobs list if it's loaded
-      if (jobs.length > 0) {
-        setJobs([response.data.job, ...jobs]);
+        return data;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load jobs");
+        console.error("Load jobs error:", err);
+        return null;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isAuthenticated, clearError]
+  );
 
-      return response.data.job;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to create job");
-      console.error("Create job error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const getJobById = useCallback(
+    async (jobId) => {
+      if (!isAuthenticated) return null;
 
-  // Update job
-  const updateJob = async (jobId, jobData) => {
-    if (!isAuthenticated) return null;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
+        const jobData = await jobService.getJobById(jobId);
+        return jobData;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load job details");
+        console.error("Get job error:", err);
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError]
+  );
 
-      const response = await api.patch(`/jobs/${jobId}`, jobData);
+  const createJob = useCallback(
+    async (jobData) => {
+      if (!isAuthenticated) return null;
 
-      // Update job in the list if it's loaded
-      if (jobs.length > 0) {
-        setJobs(
-          jobs.map((job) => (job._id === jobId ? response.data.job : job))
+      try {
+        setIsLoading(true);
+        clearError();
+
+        const createdJob = await jobService.createJob(jobData);
+
+        // Update jobs list if it's loaded
+        if (jobs.length > 0) {
+          setJobs((prevJobs) => [createdJob, ...prevJobs]);
+        }
+
+        return createdJob;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to create job");
+        console.error("Create job error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, jobs.length]
+  );
+
+  const updateJob = useCallback(
+    async (jobId, jobData) => {
+      if (!isAuthenticated) return null;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        const updatedJob = await jobService.updateJob(jobId, jobData);
+
+        // Update job in the list if it's loaded
+        if (jobs.length > 0) {
+          setJobs((prevJobs) =>
+            prevJobs.map((job) => (job._id === jobId ? updatedJob : job))
+          );
+        }
+
+        return updatedJob;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to update job");
+        console.error("Update job error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, jobs.length]
+  );
+
+  const deleteJob = useCallback(
+    async (jobId) => {
+      if (!isAuthenticated) return false;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        await jobService.deleteJob(jobId);
+
+        // Remove job from the list if it's loaded
+        if (jobs.length > 0) {
+          setJobs((prevJobs) => prevJobs.filter((job) => job._id !== jobId));
+        }
+
+        return true;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to delete job");
+        console.error("Delete job error:", err);
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, jobs.length]
+  );
+
+  const addInterview = useCallback(
+    async (jobId, interviewData) => {
+      if (!isAuthenticated) return null;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        const updatedJob = await jobService.addInterview(jobId, interviewData);
+
+        // Update job in the list if it's loaded
+        if (jobs.length > 0) {
+          setJobs((prevJobs) =>
+            prevJobs.map((job) => (job._id === jobId ? updatedJob : job))
+          );
+        }
+
+        return updatedJob;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to add interview");
+        console.error("Add interview error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, jobs.length]
+  );
+
+  const updateInterview = useCallback(
+    async (jobId, interviewId, interviewData) => {
+      if (!isAuthenticated) return null;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        const updatedJob = await jobService.updateInterview(
+          jobId,
+          interviewId,
+          interviewData
         );
+
+        // Update job in the list if it's loaded
+        if (jobs.length > 0) {
+          setJobs((prevJobs) =>
+            prevJobs.map((job) => (job._id === jobId ? updatedJob : job))
+          );
+        }
+
+        return updatedJob;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to update interview");
+        console.error("Update interview error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isAuthenticated, clearError, jobs.length]
+  );
 
-      return response.data.job;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to update job");
-      console.error("Update job error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const deleteInterview = useCallback(
+    async (jobId, interviewId) => {
+      if (!isAuthenticated) return null;
 
-  // Delete job
-  const deleteJob = async (jobId) => {
-    if (!isAuthenticated) return false;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
+        const updatedJob = await jobService.deleteInterview(jobId, interviewId);
 
-      await api.delete(`/jobs/${jobId}`);
+        // Update job in the list if it's loaded
+        if (jobs.length > 0) {
+          setJobs((prevJobs) =>
+            prevJobs.map((job) => (job._id === jobId ? updatedJob : job))
+          );
+        }
 
-      // Remove job from the list if it's loaded
-      if (jobs.length > 0) {
-        setJobs(jobs.filter((job) => job._id !== jobId));
+        return updatedJob;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to delete interview");
+        console.error("Delete interview error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
-
-      return true;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to delete job");
-      console.error("Delete job error:", err);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Add interview to job
-  const addInterview = async (jobId, interviewData) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.post(
-        `/jobs/${jobId}/interviews`,
-        interviewData
-      );
-
-      // Update job in the list if it's loaded
-      if (jobs.length > 0) {
-        setJobs(
-          jobs.map((job) => (job._id === jobId ? response.data.job : job))
-        );
-      }
-
-      return response.data.job;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to add interview");
-      console.error("Add interview error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [isAuthenticated, clearError, jobs.length]
+  );
 
   // === TASKS OPERATIONS ===
+  const loadTasks = useCallback(
+    async (filters = {}, page = 1, limit = 10) => {
+      if (!isAuthenticated) return;
 
-  // Load tasks with optional filters
-  const loadTasks = async (filters = {}, page = 1, limit = 10) => {
-    if (!isAuthenticated) return;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
+        const data = await taskService.loadTasks(filters, page, limit);
 
-      const queryParams = new URLSearchParams({
-        page,
-        limit,
-        ...filters,
-      });
+        setTasks(data.tasks);
+        setTasksPagination({
+          currentPage: data.currentPage,
+          totalPages: data.numOfPages,
+          totalItems: data.totalTasks,
+        });
 
-      const response = await api.get(`/tasks?${queryParams}`);
-
-      setTasks(response.data.tasks);
-      setTasksPagination({
-        currentPage: response.data.currentPage,
-        totalPages: response.data.numOfPages,
-        totalItems: response.data.totalTasks,
-      });
-
-      return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load tasks");
-      console.error("Load tasks error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Get task by ID
-  const getTaskById = async (taskId) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.get(`/tasks/${taskId}`);
-      return response.data.task;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load task details");
-      console.error("Get task error:", err);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Create task
-  const createTask = async (taskData) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.post("/tasks", taskData);
-
-      // Update tasks list if it's loaded
-      if (tasks.length > 0) {
-        setTasks([response.data.task, ...tasks]);
+        return data;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load tasks");
+        console.error("Load tasks error:", err);
+        return null;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isAuthenticated, clearError]
+  );
 
-      return response.data.task;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to create task");
-      console.error("Create task error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const getTaskById = useCallback(
+    async (taskId) => {
+      if (!isAuthenticated) return null;
 
-  // Update task
-  const updateTask = async (taskId, taskData) => {
-    if (!isAuthenticated) return null;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.patch(`/tasks/${taskId}`, taskData);
-
-      // Update task in the list if it's loaded
-      if (tasks.length > 0) {
-        setTasks(
-          tasks.map((task) => (task._id === taskId ? response.data.task : task))
-        );
+        const taskData = await taskService.getTaskById(taskId);
+        return taskData;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load task details");
+        console.error("Get task error:", err);
+        return null;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isAuthenticated, clearError]
+  );
 
-      return response.data.task;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to update task");
-      console.error("Update task error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const createTask = useCallback(
+    async (taskData) => {
+      if (!isAuthenticated) return null;
 
-  // Mark task as completed
-  const completeTask = async (taskId) => {
-    if (!isAuthenticated) return null;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
+        const createdTask = await taskService.createTask(taskData);
 
-      const response = await api.patch(`/tasks/${taskId}/complete`);
+        // Update tasks list if it's loaded
+        if (tasks.length > 0) {
+          setTasks((prevTasks) => [createdTask, ...prevTasks]);
+        }
 
-      // Update task in the list if it's loaded
-      if (tasks.length > 0) {
-        setTasks(
-          tasks.map((task) => (task._id === taskId ? response.data.task : task))
-        );
+        return createdTask;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to create task");
+        console.error("Create task error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isAuthenticated, clearError, tasks.length]
+  );
 
-      return response.data.task;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to complete task");
-      console.error("Complete task error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const updateTask = useCallback(
+    async (taskId, taskData) => {
+      if (!isAuthenticated) return null;
 
-  // Delete task
-  const deleteTask = async (taskId) => {
-    if (!isAuthenticated) return false;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
+        const updatedTask = await taskService.updateTask(taskId, taskData);
 
-      await api.delete(`/tasks/${taskId}`);
+        // Update task in the list if it's loaded
+        if (tasks.length > 0) {
+          setTasks((prevTasks) =>
+            prevTasks.map((task) => (task._id === taskId ? updatedTask : task))
+          );
+        }
 
-      // Remove task from the list if it's loaded
-      if (tasks.length > 0) {
-        setTasks(tasks.filter((task) => task._id !== taskId));
+        return updatedTask;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to update task");
+        console.error("Update task error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isAuthenticated, clearError, tasks.length]
+  );
 
-      return true;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to delete task");
-      console.error("Delete task error:", err);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const completeTask = useCallback(
+    async (taskId) => {
+      if (!isAuthenticated) return null;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        const updatedTask = await taskService.completeTask(taskId);
+
+        // Update task in the list if it's loaded
+        if (tasks.length > 0) {
+          setTasks((prevTasks) =>
+            prevTasks.map((task) => (task._id === taskId ? updatedTask : task))
+          );
+        }
+
+        return updatedTask;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to complete task");
+        console.error("Complete task error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, tasks.length]
+  );
+
+  const deleteTask = useCallback(
+    async (taskId) => {
+      if (!isAuthenticated) return false;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        await taskService.deleteTask(taskId);
+
+        // Remove task from the list if it's loaded
+        if (tasks.length > 0) {
+          setTasks((prevTasks) =>
+            prevTasks.filter((task) => task._id !== taskId)
+          );
+        }
+
+        return true;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to delete task");
+        console.error("Delete task error:", err);
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, tasks.length]
+  );
 
   // === CONTACTS OPERATIONS ===
+  const loadContacts = useCallback(
+    async (filters = {}, page = 1, limit = 10) => {
+      if (!isAuthenticated) return;
 
-  // Load contacts with optional filters
-  const loadContacts = async (filters = {}, page = 1, limit = 10) => {
-    if (!isAuthenticated) return;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
+        const data = await contactService.loadContacts(filters, page, limit);
 
-      const queryParams = new URLSearchParams({
-        page,
-        limit,
-        ...filters,
-      });
+        setContacts(data.contacts);
+        setContactsPagination({
+          currentPage: data.currentPage,
+          totalPages: data.numOfPages,
+          totalItems: data.totalContacts,
+        });
 
-      const response = await api.get(`/contacts?${queryParams}`);
-
-      setContacts(response.data.contacts);
-      setContactsPagination({
-        currentPage: response.data.currentPage,
-        totalPages: response.data.numOfPages,
-        totalItems: response.data.totalContacts,
-      });
-
-      return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load contacts");
-      console.error("Load contacts error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Get contact by ID
-  const getContactById = async (contactId) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.get(`/contacts/${contactId}`);
-      return response.data.contact;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load contact details");
-      console.error("Get contact error:", err);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Create contact
-  const createContact = async (contactData) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.post("/contacts", contactData);
-
-      // Update contacts list if it's loaded
-      if (contacts.length > 0) {
-        setContacts([response.data.contact, ...contacts]);
+        return data;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load contacts");
+        console.error("Load contacts error:", err);
+        return null;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isAuthenticated, clearError]
+  );
 
-      return response.data.contact;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to create contact");
-      console.error("Create contact error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const getContactById = useCallback(
+    async (contactId) => {
+      if (!isAuthenticated) return null;
 
-  // Update contact
-  const updateContact = async (contactId, contactData) => {
-    if (!isAuthenticated) return null;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.patch(`/contacts/${contactId}`, contactData);
-
-      // Update contact in the list if it's loaded
-      if (contacts.length > 0) {
-        setContacts(
-          contacts.map((contact) =>
-            contact._id === contactId ? response.data.contact : contact
-          )
+        const contactData = await contactService.getContactById(contactId);
+        return contactData;
+      } catch (err) {
+        setError(
+          err.response?.data?.message || "Failed to load contact details"
         );
+        console.error("Get contact error:", err);
+        return null;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isAuthenticated, clearError]
+  );
 
-      return response.data.contact;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to update contact");
-      console.error("Update contact error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const createContact = useCallback(
+    async (contactData) => {
+      if (!isAuthenticated) return null;
 
-  // Delete contact
-  const deleteContact = async (contactId) => {
-    if (!isAuthenticated) return false;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
+        const createdContact = await contactService.createContact(contactData);
 
-      await api.delete(`/contacts/${contactId}`);
+        // Update contacts list if it's loaded
+        if (contacts.length > 0) {
+          setContacts((prevContacts) => [createdContact, ...prevContacts]);
+        }
 
-      // Remove contact from the list if it's loaded
-      if (contacts.length > 0) {
-        setContacts(contacts.filter((contact) => contact._id !== contactId));
+        return createdContact;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to create contact");
+        console.error("Create contact error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isAuthenticated, clearError, contacts.length]
+  );
 
-      return true;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to delete contact");
-      console.error("Delete contact error:", err);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const updateContact = useCallback(
+    async (contactId, contactData) => {
+      if (!isAuthenticated) return null;
 
-  // Toggle favorite status for contact
-  const toggleContactFavorite = async (contactId) => {
-    if (!isAuthenticated) return null;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.patch(`/contacts/${contactId}/favorite`);
-
-      // Update contact in the list if it's loaded
-      if (contacts.length > 0) {
-        setContacts(
-          contacts.map((contact) =>
-            contact._id === contactId ? response.data.contact : contact
-          )
+        const updatedContact = await contactService.updateContact(
+          contactId,
+          contactData
         );
-      }
 
-      return response.data.contact;
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to update favorite status"
-      );
-      console.error("Toggle favorite error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        // Update contact in the list if it's loaded
+        if (contacts.length > 0) {
+          setContacts((prevContacts) =>
+            prevContacts.map((contact) =>
+              contact._id === contactId ? updatedContact : contact
+            )
+          );
+        }
+
+        return updatedContact;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to update contact");
+        console.error("Update contact error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, contacts.length]
+  );
+
+  const deleteContact = useCallback(
+    async (contactId) => {
+      if (!isAuthenticated) return false;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        await contactService.deleteContact(contactId);
+
+        // Remove contact from the list if it's loaded
+        if (contacts.length > 0) {
+          setContacts((prevContacts) =>
+            prevContacts.filter((contact) => contact._id !== contactId)
+          );
+        }
+
+        return true;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to delete contact");
+        console.error("Delete contact error:", err);
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, contacts.length]
+  );
+
+  const toggleContactFavorite = useCallback(
+    async (contactId) => {
+      if (!isAuthenticated) return null;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        const updatedContact = await contactService.toggleContactFavorite(
+          contactId
+        );
+
+        // Update contact in the list if it's loaded
+        if (contacts.length > 0) {
+          setContacts((prevContacts) =>
+            prevContacts.map((contact) =>
+              contact._id === contactId ? updatedContact : contact
+            )
+          );
+        }
+
+        return updatedContact;
+      } catch (err) {
+        setError(
+          err.response?.data?.message || "Failed to update favorite status"
+        );
+        console.error("Toggle favorite error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, contacts.length]
+  );
+
+  const addInteraction = useCallback(
+    async (contactId, interactionData) => {
+      if (!isAuthenticated) return null;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        const updatedContact = await contactService.addInteraction(
+          contactId,
+          interactionData
+        );
+
+        // Update contact in the list if it's loaded
+        if (contacts.length > 0) {
+          setContacts((prevContacts) =>
+            prevContacts.map((contact) =>
+              contact._id === contactId ? updatedContact : contact
+            )
+          );
+        }
+
+        return updatedContact;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to add interaction");
+        console.error("Add interaction error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, contacts.length]
+  );
+
+  const updateInteraction = useCallback(
+    async (contactId, interactionId, interactionData) => {
+      if (!isAuthenticated) return null;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        const updatedContact = await contactService.updateInteraction(
+          contactId,
+          interactionId,
+          interactionData
+        );
+
+        // Update contact in the list if it's loaded
+        if (contacts.length > 0) {
+          setContacts((prevContacts) =>
+            prevContacts.map((contact) =>
+              contact._id === contactId ? updatedContact : contact
+            )
+          );
+        }
+
+        return updatedContact;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to update interaction");
+        console.error("Update interaction error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, contacts.length]
+  );
+
+  const deleteInteraction = useCallback(
+    async (contactId, interactionId) => {
+      if (!isAuthenticated) return null;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        const updatedContact = await contactService.deleteInteraction(
+          contactId,
+          interactionId
+        );
+
+        // Update contact in the list if it's loaded
+        if (contacts.length > 0) {
+          setContacts((prevContacts) =>
+            prevContacts.map((contact) =>
+              contact._id === contactId ? updatedContact : contact
+            )
+          );
+        }
+
+        return updatedContact;
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to delete interaction");
+        console.error("Delete interaction error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, clearError, contacts.length]
+  );
 
   // === PAYMENT & PLANS OPERATIONS ===
+  const initiatePlanUpgrade = useCallback(
+    async (planId, billingType) => {
+      if (!isAuthenticated) return null;
 
-  // Initiate plan upgrade
-  const initiatePlanUpgrade = async (planId, billingType) => {
-    if (!isAuthenticated) return null;
+      try {
+        setIsLoading(true);
+        clearError();
 
-    try {
-      setIsLoading(true);
-      clearError();
+        const result = await planService.initiatePlanUpgrade(
+          planId,
+          billingType
+        );
 
-      const response = await api.post("/plans/upgrade", {
-        planId,
-        billingType,
-      });
+        // If the plan is free, update current plan immediately
+        if (result.nextStep !== "payment") {
+          await currentPlan.refreshPlan();
+        }
 
-      // If the plan is free, update current plan immediately
-      if (response.data.nextStep !== "payment") {
-        await loadCurrentPlan();
+        return result;
+      } catch (err) {
+        setError(
+          err.response?.data?.message || "Failed to initiate plan upgrade"
+        );
+        console.error("Plan upgrade error:", err);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
-
-      return response.data;
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to initiate plan upgrade"
-      );
-      console.error("Plan upgrade error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [isAuthenticated, clearError, currentPlan]
+  );
 
   // Create payment order
   const createPaymentOrder = useCallback(
@@ -640,22 +832,22 @@ export const DataProvider = ({ children }) => {
         setIsLoading(true);
         clearError();
 
-        const response = await api.post("/payments/create-order", {
+        const orderData = await paymentService.createPaymentOrder(
           planId,
-          billingType,
-        });
-        return response.data;
+          billingType
+        );
+        return orderData;
       } catch (err) {
         // Try to refresh token if 401 error
         if (err.response?.status === 401) {
           try {
             await refreshToken();
             // Retry the request after refresh
-            const response = await api.post("/payments/create-order", {
+            const orderData = await paymentService.createPaymentOrder(
               planId,
-              billingType,
-            });
-            return response.data;
+              billingType
+            );
+            return orderData;
           } catch (refreshErr) {
             setError("Your session has expired. Please log in again.");
             throw refreshErr;
@@ -682,21 +874,21 @@ export const DataProvider = ({ children }) => {
         setIsLoading(true);
         clearError();
 
-        const response = await api.post("/payments/verify", paymentData);
+        const response = await paymentService.verifyPayment(paymentData);
 
         // Refresh current plan after successful payment
-        await loadCurrentPlan();
+        await currentPlan.refreshPlan();
 
-        return response.data;
+        return response;
       } catch (err) {
         // Try to refresh token if 401 error
         if (err.response?.status === 401) {
           try {
             await refreshToken();
             // Retry the request after refresh
-            const response = await api.post("/payments/verify", paymentData);
-            await loadCurrentPlan();
-            return response.data;
+            const response = await paymentService.verifyPayment(paymentData);
+            await currentPlan.refreshPlan();
+            return response;
           } catch (refreshErr) {
             setError("Your session has expired. Please log in again.");
             throw refreshErr;
@@ -709,7 +901,7 @@ export const DataProvider = ({ children }) => {
         setIsLoading(false);
       }
     },
-    [isAuthenticated, clearError, loadCurrentPlan, refreshToken]
+    [isAuthenticated, clearError, currentPlan, refreshToken]
   );
 
   // Get payment history
@@ -720,16 +912,16 @@ export const DataProvider = ({ children }) => {
       setIsLoading(true);
       clearError();
 
-      const response = await api.get("/payments/history");
-      return response.data.transactions;
+      const transactions = await paymentService.getPaymentHistory();
+      return transactions;
     } catch (err) {
       // Try to refresh token if 401 error
       if (err.response?.status === 401) {
         try {
           await refreshToken();
           // Retry the request after refresh
-          const response = await api.get("/payments/history");
-          return response.data.transactions;
+          const transactions = await paymentService.getPaymentHistory();
+          return transactions;
         } catch (refreshErr) {
           setError("Your session has expired. Please log in again.");
           return [];
@@ -753,10 +945,10 @@ export const DataProvider = ({ children }) => {
       setIsLoading(true);
       clearError();
 
-      await api.post("/plans/cancel");
+      await planService.cancelSubscription();
 
       // Refresh current plan
-      await loadCurrentPlan();
+      await currentPlan.refreshPlan();
 
       return true;
     } catch (err) {
@@ -765,8 +957,8 @@ export const DataProvider = ({ children }) => {
         try {
           await refreshToken();
           // Retry the request after refresh
-          await api.post("/plans/cancel");
-          await loadCurrentPlan();
+          await planService.cancelSubscription();
+          await currentPlan.refreshPlan();
           return true;
         } catch (refreshErr) {
           setError("Your session has expired. Please log in again.");
@@ -781,76 +973,8 @@ export const DataProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, clearError, loadCurrentPlan, refreshToken]);
+  }, [isAuthenticated, clearError, currentPlan, refreshToken]);
 
-  // Add interaction to contact
-  const addInteraction = async (contactId, interactionData) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.post(
-        `/contacts/${contactId}/interactions`,
-        interactionData
-      );
-      return response.data.contact;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to add interaction");
-      console.error("Add interaction error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Update interaction
-  const updateInteraction = async (
-    contactId,
-    interactionId,
-    interactionData
-  ) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.patch(
-        `/contacts/${contactId}/interactions/${interactionId}`,
-        interactionData
-      );
-      return response.data.contact;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to update interaction");
-      console.error("Update interaction error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Delete interaction
-  const deleteInteraction = async (contactId, interactionId) => {
-    if (!isAuthenticated) return null;
-
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await api.delete(
-        `/contacts/${contactId}/interactions/${interactionId}`
-      );
-      return response.data.contact;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to delete interaction");
-      console.error("Delete interaction error:", err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
   // Context value
   const contextValue = {
     // State
@@ -881,6 +1005,8 @@ export const DataProvider = ({ children }) => {
     updateJob,
     deleteJob,
     addInterview,
+    updateInterview,
+    deleteInterview,
 
     // Tasks methods
     loadTasks,
