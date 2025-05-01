@@ -2,8 +2,6 @@
 
 A comprehensive application to help job seekers organize and manage their job search process from start to finish.
 
----
-
 ## Table of Contents
 
 - [Overview](#overview)
