@@ -401,7 +401,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [React Router](https://reactrouter.com/)
 - [Axios](https://axios-http.com/)
 - [Razorpay](https://razorpay.com/)
-
-```
-
-```
