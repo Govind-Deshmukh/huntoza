@@ -1,3 +1,6 @@
+// Improved version of src/pages/auth/SignupWithPlanPage.js
+// This page will handle both registration and plan selection
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -104,11 +107,12 @@ const SignupWithPlanPage = () => {
             planId: selectedPlan._id,
             billingType: billingType,
             userId: response.user._id,
+            fromRegistration: true, // Flag to identify this is a new signup
           },
         });
       }
     } catch (err) {
-      // Error handling is done by AuthContext
+      // Error is already handled by the AuthContext
       setStep(1); // Go back to step 1 if there's an error
     }
   };

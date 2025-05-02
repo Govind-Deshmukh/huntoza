@@ -1,17 +1,12 @@
+// src/hooks/useRazerpay.js
+
 import { useState, useCallback } from "react";
 
-/**
- * Custom hook to integrate Razorpay payment gateway
- * @returns {Object} Razorpay integration methods and state
- */
 const useRazorpay = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  /**
-   * Load Razorpay script asynchronously
-   * @returns {Promise} Promise that resolves when Razorpay script is loaded
-   */
+  // Load Razorpay script dynamically
   const loadRazorpayScript = useCallback(() => {
     return new Promise((resolve, reject) => {
       // Check if Razorpay is already loaded
@@ -40,12 +35,7 @@ const useRazorpay = () => {
     });
   }, []);
 
-  /**
-   * Process payment with Razorpay
-   * @param {Object} paymentData - Payment details including order ID, amount, etc.
-   * @param {Object} userData - User information for prefill
-   * @returns {Promise} Promise that resolves with payment response
-   */
+  // Process payment with Razorpay
   const processPayment = useCallback(
     async (paymentData, userData) => {
       if (!paymentData || !paymentData.order || !paymentData.keyId) {
@@ -74,9 +64,14 @@ const useRazorpay = () => {
           theme: {
             color: "#3498db",
           },
-          // Only handle successful payments here
-          handler: function (response) {
-            // This will be replaced by the promise resolve
+          modal: {
+            ondismiss: function () {
+              setError("Payment cancelled by user");
+            },
+          },
+          notes: {
+            plan_id: paymentData.order.notes.planId,
+            billing_type: paymentData.order.notes.billingType,
           },
         };
 
@@ -85,11 +80,6 @@ const useRazorpay = () => {
             ...options,
             handler: (response) => {
               resolve(response);
-            },
-            modal: {
-              ondismiss: () => {
-                reject(new Error("Payment canceled by user"));
-              },
             },
           });
 

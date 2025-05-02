@@ -3,6 +3,7 @@ import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
 
 const DashboardPage = () => {
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { user } = useAuth();
 
   // Mock stats for demonstration

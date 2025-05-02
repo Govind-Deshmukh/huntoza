@@ -1,5 +1,8 @@
+// src/pages/plans/PaymentPage.js - Let's enhance this
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
 import useRazorpay from "../../hooks/useRazerpay";
@@ -14,6 +17,7 @@ const PaymentPage = () => {
     isLoading: dataLoading,
     error: dataError,
   } = useData();
+
   const {
     processPayment,
     isLoading: razorpayLoading,
@@ -24,16 +28,20 @@ const PaymentPage = () => {
   const [paymentData, setPaymentData] = useState(null);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
 
   // Get plan and billing info from location state
   const { planId, billingType } = location.state || {};
 
-  // Error handling
-  const error = dataError || razorpayError;
+  // Combined error and loading states
+  const error = dataError || razorpayError || paymentError;
   const isLoading = dataLoading || razorpayLoading;
 
   useEffect(() => {
-    // Redirect if no plan data
+    // Clear errors on component mount
+    clearError();
+
+    // Redirect if no plan data is present
     if (!planId || !billingType) {
       navigate("/plans");
       return;
@@ -42,13 +50,14 @@ const PaymentPage = () => {
     const initializePayment = async () => {
       try {
         setPaymentProcessing(true);
-        clearError();
 
         // Create payment order
         const orderData = await createPaymentOrder(planId, billingType);
         setPaymentData(orderData);
-        setPaymentProcessing(false);
       } catch (err) {
+        setPaymentError(err.message || "Failed to create payment order");
+        console.error("Payment initialization error:", err);
+      } finally {
         setPaymentProcessing(false);
       }
     };
@@ -61,6 +70,7 @@ const PaymentPage = () => {
 
     try {
       setPaymentProcessing(true);
+      setPaymentError(null);
 
       // Process payment with Razorpay
       const response = await processPayment(paymentData, {
@@ -71,6 +81,7 @@ const PaymentPage = () => {
       // Handle payment success
       await handlePaymentSuccess(response, paymentData.transaction);
     } catch (err) {
+      setPaymentError(err.message || "Payment processing failed");
       console.error("Payment failed:", err);
       setPaymentProcessing(false);
     }
@@ -101,6 +112,7 @@ const PaymentPage = () => {
         });
       }, 3000);
     } catch (err) {
+      setPaymentError(err.message || "Payment verification failed");
       console.error("Payment verification failed:", err);
     } finally {
       setPaymentProcessing(false);
@@ -111,165 +123,159 @@ const PaymentPage = () => {
     navigate("/plans");
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="text-center text-3xl font-extrabold text-gray-900">
-          {paymentSuccess ? "Payment Successful" : "Complete Payment"}
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          {paymentSuccess
-            ? "Your plan has been upgraded successfully"
-            : "Complete your payment to activate your subscription"}
-        </p>
-      </div>
+  // Format currency for display
+  const formatCurrency = (amount, currency = "INR") => {
+    const formatter = new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 0,
+    });
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {isLoading || paymentProcessing ? (
-            <div className="flex flex-col items-center justify-center py-6">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-              <p className="text-gray-700">
-                {paymentProcessing
-                  ? "Processing your payment..."
-                  : "Initializing payment..."}
-              </p>
+    return formatter.format(amount / 100);
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="py-6">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-gray-900">
+              {paymentSuccess ? "Payment Successful!" : "Complete Your Payment"}
+            </h1>
+            <p className="mt-2 text-gray-600">
+              {paymentSuccess
+                ? "Your plan has been upgraded successfully."
+                : "Please review your plan details and proceed with payment."}
+            </p>
+          </div>
+
+          {/* Loading state */}
+          {(isLoading || paymentProcessing) && (
+            <div className="flex justify-center my-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+              <span className="ml-3 text-gray-700">
+                {paymentProcessing ? "Processing payment..." : "Loading..."}
+              </span>
             </div>
-          ) : paymentSuccess ? (
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                <svg
-                  className="h-6 w-6 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M5 13l4 4L19 7"
-                  ></path>
-                </svg>
+          )}
+
+          {/* Error message */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-100 rounded-lg p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-5 w-5 text-red-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Payment Error
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">{error}</div>
+                </div>
               </div>
-              <h3 className="mt-3 text-lg font-medium text-gray-900">
-                Payment Successful
-              </h3>
-              <p className="mt-2 text-sm text-gray-500">
-                Thank you for your payment. Your subscription has been
-                activated.
-              </p>
-              <div className="mt-5">
-                <p className="text-sm text-gray-500">
+            </div>
+          )}
+
+          {/* Success message */}
+          {paymentSuccess && (
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                  <svg
+                    className="h-6 w-6 text-green-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+                <h2 className="mt-3 text-lg font-medium text-gray-900">
+                  Payment successful!
+                </h2>
+                <p className="mt-2 text-sm text-gray-500">
+                  Thank you for your payment. Your subscription has been
+                  activated.
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
                   Redirecting to dashboard...
                 </p>
               </div>
             </div>
-          ) : error ? (
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                <svg
-                  className="h-6 w-6 text-red-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  ></path>
-                </svg>
-              </div>
-              <h3 className="mt-3 text-lg font-medium text-gray-900">
-                Payment Failed
-              </h3>
-              <p className="mt-2 text-sm text-red-600">{error}</p>
-              <div className="mt-5 flex justify-center space-x-3">
-                <button
-                  onClick={() => window.location.reload()}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Try Again
-                </button>
-                <button
-                  onClick={handleCancel}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : !paymentData ? (
-            <div className="text-center py-6">
-              <p className="text-gray-700">Preparing payment details...</p>
-            </div>
-          ) : (
-            <div className="text-center">
-              <p className="text-gray-700 mb-4">
-                Please click the button below to proceed with your payment.
-              </p>
-              <button
-                onClick={handlePayment}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Pay Now
-              </button>
-              <button
-                onClick={handleCancel}
-                className="mt-3 w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Cancel
-              </button>
-            </div>
           )}
-        </div>
 
-        {/* Order Summary */}
-        {paymentData && !paymentSuccess && !isLoading && !paymentProcessing && (
-          <div className="mt-4 bg-white py-6 px-4 shadow sm:rounded-lg sm:px-10">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Order Summary
-            </h3>
-            <div className="border-t border-gray-200 pt-4">
-              <dl className="divide-y divide-gray-200">
-                <div className="py-2 flex justify-between">
-                  <dt className="text-sm font-medium text-gray-500">Plan</dt>
-                  <dd className="text-sm font-medium text-gray-900">
-                    {paymentData.order.notes?.planName
-                      ? paymentData.order.notes.planName
-                          .charAt(0)
-                          .toUpperCase() +
-                        paymentData.order.notes.planName.slice(1) +
-                        " Plan"
-                      : "Subscription"}
-                  </dd>
+          {/* Payment details */}
+          {!isLoading &&
+            !paymentProcessing &&
+            !paymentSuccess &&
+            paymentData && (
+              <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h2 className="text-lg font-medium text-gray-900">
+                    Order Summary
+                  </h2>
                 </div>
-                <div className="py-2 flex justify-between">
-                  <dt className="text-sm font-medium text-gray-500">Billing</dt>
-                  <dd className="text-sm font-medium text-gray-900 capitalize">
-                    {paymentData.order.notes?.billingType || billingType}
-                  </dd>
+
+                <div className="px-6 py-4">
+                  <div className="flex justify-between py-3 border-b border-gray-100">
+                    <span className="text-gray-600">Plan</span>
+                    <span className="font-medium text-gray-800 capitalize">
+                      {paymentData.order.notes?.planName || "Subscription"} Plan
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between py-3 border-b border-gray-100">
+                    <span className="text-gray-600">Billing Cycle</span>
+                    <span className="font-medium text-gray-800 capitalize">
+                      {paymentData.order.notes?.billingType || billingType}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between py-3 border-b border-gray-100">
+                    <span className="text-gray-600">Amount</span>
+                    <span className="font-medium text-gray-800">
+                      {formatCurrency(
+                        paymentData.order.amount,
+                        paymentData.order.currency
+                      )}
+                    </span>
+                  </div>
                 </div>
-                <div className="py-2 flex justify-between">
-                  <dt className="text-sm font-medium text-gray-500">Amount</dt>
-                  <dd className="text-sm font-medium text-gray-900">
-                    {new Intl.NumberFormat("en-IN", {
-                      style: "currency",
-                      currency: paymentData.order.currency || "INR",
-                      minimumFractionDigits: 0,
-                    }).format(paymentData.order.amount / 100)}
-                  </dd>
+
+                <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-4">
+                  <button
+                    onClick={handleCancel}
+                    className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePayment}
+                    className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    Pay Now
+                  </button>
                 </div>
-              </dl>
-            </div>
-          </div>
-        )}
+              </div>
+            )}
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

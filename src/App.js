@@ -54,6 +54,8 @@ function App() {
               <Route path="/register" element={<SignupPage />} />
               <Route path="/register-plan" element={<SignupWithPlanPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/plans" element={<PlansPage />} />
+
               <Route
                 path="/reset-password/:token"
                 element={<ResetPasswordPage />}
@@ -95,7 +97,6 @@ function App() {
                 <Route path="/contacts/:id" element={<ContactDetailsPage />} />
 
                 {/* Plan and Payment Routes */}
-                <Route path="/plans" element={<PlansPage />} />
                 <Route path="/payment" element={<PaymentPage />} />
                 <Route
                   path="/payment-history"
