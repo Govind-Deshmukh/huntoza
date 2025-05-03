@@ -1,0 +1,61 @@
+# UI GitLab CI/CD Pipeline Configuration
+stages:
+  - build
+  - scan
+  - deploy
+
+variables:
+  UI_IMAGE_NAME: $CI_REGISTRY_IMAGE/ui:$CI_COMMIT_SHA
+  UI_IMAGE_LATEST: $CI_REGISTRY_IMAGE/ui:latest
+
+# Build UI Docker image
+build:
+  stage: build
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $UI_IMAGE_NAME -t $UI_IMAGE_LATEST .
+    - docker push $UI_IMAGE_NAME
+    - docker push $UI_IMAGE_LATEST
+  tags:
+    - docker
+
+# Run vulnerability scan on UI code
+scan:
+  stage: scan
+  image: registry.gitlab.com/gitlab-org/security-products/analyzers/gemnasium:2
+  script:
+    - /analyzer run
+  artifacts:
+    reports:
+      dependency_scanning: gl-dependency-scanning-report.json
+  tags:
+    - docker
+  allow_failure: true
+
+# Deploy UI to production
+deploy:
+  stage: deploy
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker pull $UI_IMAGE_LATEST
+    - docker stop pursuitpal_ui || true
+    - docker rm pursuitpal_ui || true
+    - docker run -d --name pursuitpal_ui -p 3000:3000 $UI_IMAGE_LATEST
+  tags:
+    - e2e_prod_server
+  environment:
+    name: production
+  only:
+    - master
