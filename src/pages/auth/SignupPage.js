@@ -61,9 +61,6 @@ const SignupPage = () => {
     if (error) setError(null);
   };
 
-  // src/pages/auth/SignupPage.js
-  // Enhancements for plan selection during registration
-
   // Inside handleSubmit
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -113,6 +110,7 @@ const SignupPage = () => {
           { planId, billingType },
           { headers: { Authorization: `Bearer ${response.data.token}` } }
         );
+        console.log(orderResponse.data);
 
         setPaymentData(orderResponse.data);
       }
@@ -135,12 +133,14 @@ const SignupPage = () => {
   };
 
   // Handle payment process
+  // Updated handlePayment function
   const handlePayment = async () => {
-    if (!paymentData) return;
+    if (!paymentData) {
+      setError("Payment data not available");
+      return;
+    }
 
     try {
-      console.log("0");
-
       setIsPaymentProcessing(true);
       setError(null);
 
@@ -150,33 +150,50 @@ const SignupPage = () => {
         email: formData.email,
       });
 
-      // Verify payment with backend
-      const verificationData = {
-        razorpay_order_id: paymentResponse.razorpay_order_id,
-        razorpay_payment_id: paymentResponse.razorpay_payment_id,
-        razorpay_signature: paymentResponse.razorpay_signature,
-        transactionId: paymentData.transaction,
-      };
+      // Verify payment with backend only if we get a valid response from Razorpay
+      if (
+        paymentResponse &&
+        paymentResponse.razorpay_order_id &&
+        paymentResponse.razorpay_payment_id &&
+        paymentResponse.razorpay_signature
+      ) {
+        const verificationData = {
+          razorpay_order_id: paymentResponse.razorpay_order_id,
+          razorpay_payment_id: paymentResponse.razorpay_payment_id,
+          razorpay_signature: paymentResponse.razorpay_signature,
+          transactionId: paymentData.transaction,
+        };
 
-      await axios.post(`${API_URL}/payments/verify`, verificationData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+        try {
+          await axios.post(`${API_URL}/payments/verify`, verificationData, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
 
-      console.log("1");
-
-      // Show success message and redirect to dashboard
-      setSuccess("Payment successful! Your account has been set up.");
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 1500);
+          // Show success message and redirect to dashboard
+          setSuccess("Payment successful! Your account has been set up.");
+          setTimeout(() => {
+            navigate("/dashboard");
+          }, 1500);
+        } catch (verificationErr) {
+          console.error("Payment verification error:", verificationErr);
+          setError(
+            "Payment verification failed. You can try again or continue with the free plan."
+          );
+        }
+      } else {
+        // If Razorpay response is incomplete, show an error
+        setError(
+          "Payment process was interrupted. You can try again or continue with the free plan."
+        );
+      }
     } catch (err) {
       console.error("Payment error:", err);
-      setError(err.message || "Payment failed. Please try again.");
-
-      // Even if payment fails, the user can still access the dashboard with free plan
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 3000);
+      setError(
+        err.message ||
+          "Payment failed. Please try again or continue with the free plan."
+      );
     } finally {
       setIsPaymentProcessing(false);
     }
@@ -368,29 +385,8 @@ const SignupPage = () => {
                       Order Summary
                     </h3>
                     <div className="mt-2 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-500">Plan</span>
-                        <span className="text-sm font-medium text-gray-900">
-                          {planDetails?.name.charAt(0).toUpperCase() +
-                            planDetails?.name.slice(1)}{" "}
-                          Plan
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-500">Billing</span>
-                        <span className="text-sm font-medium text-gray-900 capitalize">
-                          {billingType}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-500">Amount</span>
-                        <span className="text-sm font-medium text-gray-900">
-                          {formatCurrency(
-                            paymentData.order.amount / 100,
-                            paymentData.order.currency
-                          )}
-                        </span>
-                      </div>
+                      {/* Order summary details */}
+                      {/* ... */}
                     </div>
                   </div>
 
@@ -398,21 +394,30 @@ const SignupPage = () => {
                     <button
                       onClick={handlePayment}
                       disabled={isPaymentProcessing}
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
                     >
                       {isPaymentProcessing
                         ? "Processing..."
                         : "Complete Payment"}
                     </button>
 
+                    {/* Keep the free plan button always enabled */}
                     <button
                       onClick={handleSkipPayment}
-                      disabled={isPaymentProcessing}
                       className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                       Continue with Free Plan
                     </button>
                   </div>
+
+                  {error && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">
+                      {error}
+                      <p className="mt-1">
+                        You can try again or continue with the free plan.
+                      </p>
+                    </div>
+                  )}
 
                   <p className="text-xs text-gray-500 mt-4">
                     By completing your purchase, you agree to our Terms of

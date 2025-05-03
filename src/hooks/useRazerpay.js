@@ -34,7 +34,7 @@ const useRazorpay = () => {
     });
   }, []);
 
-  // Process payment with Razorpay
+  // Improved processPayment function in useRazorpay.js
   const processPayment = useCallback(
     async (paymentData, userData) => {
       if (!paymentData || !paymentData.order || !paymentData.keyId) {
@@ -46,7 +46,7 @@ const useRazorpay = () => {
 
       try {
         // Load Razorpay script if not already loaded
-        const Razorpay = await loadRazorpayScript();
+        await loadRazorpayScript();
 
         return new Promise((resolve, reject) => {
           const options = {
@@ -54,40 +54,39 @@ const useRazorpay = () => {
             amount: paymentData.order.amount,
             currency: paymentData.order.currency || "INR",
             name: "Job Hunt Tracker",
-            description: `${
-              paymentData.order.notes?.planName || "Premium"
-            } Plan`,
+            description: "Plan Subscription",
             order_id: paymentData.order.id,
             prefill: {
               name: userData?.name || "",
               email: userData?.email || "",
-              contact: userData?.phone || "",
             },
             theme: {
-              color: "#3f51b5",
+              color: "#3498db",
             },
             modal: {
               ondismiss: function () {
-                reject(new Error("Payment canceled by user"));
+                reject(new Error("Payment cancelled by user"));
               },
             },
             notes: {
-              plan_id: paymentData.order.notes?.planId,
               transaction_id: paymentData.transaction,
+            },
+            handler: function (response) {
+              resolve(response);
             },
           };
 
-          const razorpayInstance = new Razorpay(options);
+          try {
+            const razorpayInstance = new window.Razorpay(options);
 
-          razorpayInstance.on("payment.success", function (response) {
-            resolve(response);
-          });
+            razorpayInstance.on("payment.failed", function (resp) {
+              reject(new Error(resp.error.description || "Payment failed"));
+            });
 
-          razorpayInstance.on("payment.error", function (response) {
-            reject(new Error(response.error?.description || "Payment failed"));
-          });
-
-          razorpayInstance.open();
+            razorpayInstance.open();
+          } catch (err) {
+            reject(new Error("Failed to initialize payment gateway"));
+          }
         });
       } catch (err) {
         setError(err.message || "Payment processing failed");
