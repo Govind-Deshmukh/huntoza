@@ -40,6 +40,7 @@ import ApplicationsPage from "./pages/dashboard/ApplicationsPage";
 import JobFormPage from "./pages/dashboard/JobFormPage";
 import HomePage from "./pages/home/HomePage";
 import PaymentPage from "./pages/payment/PaymentPage";
+import PlansPage from "./pages/dashboard/PlansPage";
 
 function App() {
   return (
@@ -64,7 +65,7 @@ function App() {
                 {/* Dashboard */}
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
-
+                <Route path="/plans" element={<PlansPage />} />
                 {/* Jobs Routes */}
                 <Route path="/applications" element={<ApplicationsPage />} />
                 <Route path="/jobs/new" element={<JobFormPage />} />

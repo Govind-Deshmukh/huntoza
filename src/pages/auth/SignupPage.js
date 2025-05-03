@@ -61,7 +61,10 @@ const SignupPage = () => {
     if (error) setError(null);
   };
 
-  // Handle form submission
+  // src/pages/auth/SignupPage.js
+  // Enhancements for plan selection during registration
+
+  // Inside handleSubmit
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -80,8 +83,6 @@ const SignupPage = () => {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        planId: planId || undefined, // Include plan ID if provided
-        billingType: billingType || undefined,
       };
 
       // Register user
@@ -96,7 +97,7 @@ const SignupPage = () => {
         localStorage.setItem("refreshToken", response.data.refreshToken);
       }
 
-      if (isFreePlan || !planId) {
+      if (!planId || isFreePlan) {
         // Free plan or no plan specified - go directly to dashboard
         setSuccess("Account created successfully!");
         setTimeout(() => {
@@ -125,11 +126,21 @@ const SignupPage = () => {
     }
   };
 
+  // Add this function to handle payment failure
+  const handleSkipPayment = () => {
+    setSuccess("Account created with free plan. You can upgrade later.");
+    setTimeout(() => {
+      navigate("/dashboard");
+    }, 1500);
+  };
+
   // Handle payment process
   const handlePayment = async () => {
     if (!paymentData) return;
 
     try {
+      console.log("0");
+
       setIsPaymentProcessing(true);
       setError(null);
 
@@ -151,6 +162,8 @@ const SignupPage = () => {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
+      console.log("1");
+
       // Show success message and redirect to dashboard
       setSuccess("Payment successful! Your account has been set up.");
       setTimeout(() => {
@@ -167,14 +180,6 @@ const SignupPage = () => {
     } finally {
       setIsPaymentProcessing(false);
     }
-  };
-
-  // Skip payment and continue with free plan
-  const handleSkipPayment = () => {
-    setSuccess("Account created with free plan. You can upgrade later.");
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1500);
   };
 
   // Format currency for display

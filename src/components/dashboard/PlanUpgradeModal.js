@@ -1,14 +1,14 @@
-// Create a new file: src/components/dashboard/PlanUpgradeModal.js
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useData } from "../../context/DataContext";
 
 const PlanUpgradeModal = ({ isOpen, onClose }) => {
-  const { plans, loadPlans, currentPlan } = useData();
+  const navigate = useNavigate();
+  const { plans, loadPlans, currentPlan, isLoading, error } = useData();
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [billingType, setBillingType] = useState("monthly");
-  const navigate = useNavigate();
 
+  // Load plans when modal opens
   useEffect(() => {
     if (isOpen) {
       loadPlans();
@@ -16,18 +16,21 @@ const PlanUpgradeModal = ({ isOpen, onClose }) => {
   }, [isOpen, loadPlans]);
 
   // Filter out current plan and lower-tier plans
-  const availablePlans = plans.filter((plan) => {
-    // If no current plan info, show all plans
-    if (!currentPlan || !currentPlan.plan) return true;
+  const getAvailablePlans = () => {
+    if (!plans || !currentPlan?.plan) return [];
 
-    // Free plan users can see all paid plans
-    if (currentPlan.plan.name === "free") return plan.name !== "free";
+    // Get the current plan tier
+    const planTiers = { free: 0, basic: 1, premium: 2, enterprise: 3 };
+    const currentTier = planTiers[currentPlan.plan.name] || 0;
 
-    // Logic for upgrading between paid plans
-    // This is simplified - you'd need proper plan hierarchy logic
-    const planOrder = { free: 0, basic: 1, premium: 2, enterprise: 3 };
-    return planOrder[plan.name] > planOrder[currentPlan.plan.name];
-  });
+    // Return only higher tier plans
+    return plans.filter((plan) => {
+      const planTier = planTiers[plan.name] || 0;
+      return planTier > currentTier;
+    });
+  };
+
+  const availablePlans = getAvailablePlans();
 
   const handlePlanSelect = (plan) => {
     setSelectedPlan(plan);
@@ -36,19 +39,21 @@ const PlanUpgradeModal = ({ isOpen, onClose }) => {
   const handleUpgrade = () => {
     if (!selectedPlan) return;
 
+    // Navigate to payment page with plan info
     navigate("/payment", {
       state: {
         planId: selectedPlan._id,
-        billingType: billingType,
-        isUpgrade: true,
+        billingType,
+        fromUpgrade: true,
       },
     });
 
     onClose();
   };
 
+  // Calculate yearly savings compared to monthly
   const calculateYearlySavings = (plan) => {
-    if (!plan || !plan.price) return 0;
+    if (!plan?.price) return 0;
     const monthlyTotal = plan.price.monthly * 12;
     const yearlyCost = plan.price.yearly;
     return Math.round(((monthlyTotal - yearlyCost) / monthlyTotal) * 100);
@@ -59,6 +64,7 @@ const PlanUpgradeModal = ({ isOpen, onClose }) => {
   return (
     <div className="fixed z-10 inset-0 overflow-y-auto">
       <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        {/* Background overlay */}
         <div
           className="fixed inset-0 transition-opacity"
           aria-hidden="true"
@@ -67,129 +73,159 @@ const PlanUpgradeModal = ({ isOpen, onClose }) => {
           <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
         </div>
 
+        {/* Modal content */}
         <span
           className="hidden sm:inline-block sm:align-middle sm:h-screen"
           aria-hidden="true"
         >
           &#8203;
         </span>
-
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="sm:flex sm:items-start">
-              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+            <div>
+              <div className="text-center sm:text-left">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">
                   Upgrade Your Plan
                 </h3>
-                <div className="mt-2">
-                  <p className="text-sm text-gray-500">
-                    Choose a plan that best fits your needs
-                  </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  Choose a plan that best fits your needs
+                </p>
+              </div>
 
-                  {/* Billing toggle */}
-                  <div className="flex justify-center my-4">
-                    <div className="relative flex items-center">
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="modal-monthly"
-                          name="modal-billing-type"
-                          value="monthly"
-                          checked={billingType === "monthly"}
-                          onChange={() => setBillingType("monthly")}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                        />
-                        <label
-                          htmlFor="modal-monthly"
-                          className="ml-2 text-gray-700"
-                        >
-                          Monthly
-                        </label>
-                      </div>
-                      <div className="flex items-center ml-6">
-                        <input
-                          type="radio"
-                          id="modal-yearly"
-                          name="modal-billing-type"
-                          value="yearly"
-                          checked={billingType === "yearly"}
-                          onChange={() => setBillingType("yearly")}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                        />
-                        <label
-                          htmlFor="modal-yearly"
-                          className="ml-2 text-gray-700"
-                        >
-                          Yearly{" "}
-                          <span className="text-green-600">
-                            (Save up to 20%)
-                          </span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
+              {/* Billing toggle */}
+              <div className="flex justify-center my-6">
+                <div className="relative inline-flex self-center rounded-lg bg-gray-100 p-1">
+                  <button
+                    className={`${
+                      billingType === "monthly"
+                        ? "bg-white shadow-sm"
+                        : "bg-transparent"
+                    } relative w-28 py-2 text-sm font-medium rounded-md focus:outline-none transition-colors`}
+                    onClick={() => setBillingType("monthly")}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    className={`${
+                      billingType === "yearly"
+                        ? "bg-white shadow-sm"
+                        : "bg-transparent"
+                    } relative w-28 py-2 text-sm font-medium rounded-md focus:outline-none transition-colors`}
+                    onClick={() => setBillingType("yearly")}
+                  >
+                    Yearly
+                    <span className="text-xs text-green-500 block">
+                      Save up to 20%
+                    </span>
+                  </button>
+                </div>
+              </div>
 
-                  {/* Plans */}
-                  <div className="space-y-4 mt-4">
-                    {availablePlans.map((plan) => (
-                      <div
-                        key={plan._id}
-                        className={`border rounded-md p-4 ${
-                          selectedPlan && selectedPlan._id === plan._id
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-gray-300"
-                        } cursor-pointer`}
-                        onClick={() => handlePlanSelect(plan)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <input
-                              type="radio"
-                              id={`modal-plan-${plan._id}`}
-                              name="modal-plan"
-                              checked={
-                                selectedPlan && selectedPlan._id === plan._id
-                              }
-                              onChange={() => handlePlanSelect(plan)}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                            />
-                            <label
-                              htmlFor={`modal-plan-${plan._id}`}
-                              className="ml-3 block font-medium text-gray-700"
-                            >
-                              {plan.name.charAt(0).toUpperCase() +
-                                plan.name.slice(1)}{" "}
-                              Plan
-                            </label>
+              {isLoading ? (
+                <div className="flex justify-center py-6">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              ) : error ? (
+                <div className="text-center text-red-500 py-4">{error}</div>
+              ) : availablePlans.length === 0 ? (
+                <div className="text-center text-gray-500 py-4">
+                  You're already on our highest plan!
+                </div>
+              ) : (
+                <div className="mt-6 grid gap-5 md:grid-cols-2">
+                  {availablePlans.map((plan) => (
+                    <div
+                      key={plan._id}
+                      className={`border ${
+                        selectedPlan?._id === plan._id
+                          ? "border-blue-500 ring-2 ring-blue-200"
+                          : "border-gray-200"
+                      } rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer`}
+                      onClick={() => handlePlanSelect(plan)}
+                    >
+                      <div className="p-5">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 capitalize">
+                              {plan.name} Plan
+                            </h3>
+                            <p className="mt-1 text-sm text-gray-500">
+                              {plan.description}
+                            </p>
                           </div>
                           <div className="text-right">
-                            <span className="text-lg font-medium text-gray-900">
+                            <div className="text-xl font-bold text-gray-900">
+                              ₹
                               {billingType === "monthly"
-                                ? `₹${plan.price.monthly}/month`
-                                : `₹${plan.price.yearly}/year`}
-                            </span>
+                                ? plan.price.monthly
+                                : plan.price.yearly}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              /{billingType}
+                            </div>
                             {billingType === "yearly" && (
-                              <span className="block text-sm text-green-600">
+                              <div className="text-xs text-green-500">
                                 Save {calculateYearlySavings(plan)}%
-                              </span>
+                              </div>
                             )}
                           </div>
                         </div>
-                        <p className="mt-2 text-sm text-gray-600">
-                          {plan.description}
-                        </p>
+
+                        <div className="mt-4">
+                          <ul className="space-y-2">
+                            {plan.features
+                              .filter((feature) => feature.included)
+                              .slice(0, 4)
+                              .map((feature, idx) => (
+                                <li key={idx} className="flex">
+                                  <svg
+                                    className="h-5 w-5 text-green-500 mr-2 flex-shrink-0"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                  <span className="text-sm text-gray-600">
+                                    {feature.name}
+                                  </span>
+                                </li>
+                              ))}
+                          </ul>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+
+                      <div className="px-5 py-3 bg-gray-50 border-t border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-500">
+                            {plan.limits.jobApplications === -1
+                              ? "Unlimited applications"
+                              : `${plan.limits.jobApplications} applications`}
+                          </span>
+                          <input
+                            type="radio"
+                            checked={selectedPlan?._id === plan._id}
+                            onChange={() => handlePlanSelect(plan)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
           </div>
           <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
             <button
               type="button"
               onClick={handleUpgrade}
-              disabled={!selectedPlan}
+              disabled={!selectedPlan || isLoading}
               className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:bg-blue-300"
             >
               Upgrade

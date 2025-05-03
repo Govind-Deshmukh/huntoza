@@ -1,18 +1,16 @@
-// src/pages/plans/PaymentPage.js
-
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
+import useRazorpay from "../../hooks/useRazerpay";
 
 const PaymentPage = () => {
-  // Get router location and navigate function
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { processPayment } = useRazorpay();
 
-  // Get needed functions from DataContext
   const {
     plans,
     loadPlans,
@@ -34,9 +32,17 @@ const PaymentPage = () => {
   const [transactionId, setTransactionId] = useState(null);
 
   // Get plan and billing info from location state
-  const { planId, billingType, fromRegistration } = location.state || {};
+  const {
+    planId,
+    billingType = "monthly",
+    fromRegistration,
+    fromUpgrade,
+  } = location.state || {};
 
-  // Load the selected plan details when component mounts
+  // src/pages/payment/PaymentPage.js
+  // Key parts that need to be updated
+
+  // Inside the component
   useEffect(() => {
     clearError();
 
@@ -98,6 +104,31 @@ const PaymentPage = () => {
     }
   };
 
+  // Handle payment retry
+  const handleRetry = async () => {
+    // Clear any existing errors
+    setProcessingError(null);
+
+    // Reinitiate payment
+    await initiatePayment(planId, billingType);
+  };
+
+  // Handle payment cancellation - continue with free plan
+  const handleCancel = async () => {
+    try {
+      // Find free plan
+      const freePlan = plans.find((p) => p.name === "free");
+      if (freePlan) {
+        await handleFreePlan(freePlan._id);
+      } else {
+        // If no free plan found, just redirect
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      navigate("/dashboard");
+    }
+  };
+
   // Initiate payment process
   const initiatePayment = async (planId, billingType) => {
     try {
@@ -121,7 +152,7 @@ const PaymentPage = () => {
   };
 
   // Handle Razorpay payment
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!paymentData || !orderId) {
       setProcessingError("Payment data not available");
       return;
@@ -129,83 +160,25 @@ const PaymentPage = () => {
 
     setPaymentStatus("processing");
 
-    // Load Razorpay script dynamically
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-
-    script.onload = () => {
-      const options = {
-        key: paymentData.keyId,
-        amount: paymentData.order.amount,
-        currency: paymentData.order.currency || "INR",
-        name: "Job Hunt Tracker",
-        description: `${
-          paymentData.order.notes?.planName || "Subscription"
-        } Plan`,
-        order_id: orderId,
-        handler: function (response) {
-          // Handle successful payment
-          handlePaymentSuccess(response);
-        },
-        prefill: {
-          name: user?.name || paymentData.user?.name,
-          email: user?.email || paymentData.user?.email,
-        },
-        notes: {
-          plan_id: paymentData.order.notes?.planId,
-          transaction_id: transactionId,
-        },
-        theme: {
-          color: "#3f51b5",
-        },
-        modal: {
-          ondismiss: function () {
-            setPaymentStatus("pending");
-          },
-        },
-      };
-
-      try {
-        const paymentObject = new window.Razorpay(options);
-        paymentObject.open();
-      } catch (err) {
-        setPaymentStatus("failed");
-        setProcessingError("Failed to initialize payment gateway");
-      }
-    };
-
-    script.onerror = () => {
-      setPaymentStatus("failed");
-      setProcessingError("Failed to load payment gateway");
-    };
-
-    document.body.appendChild(script);
-  };
-
-  // Handle successful payment
-  const handlePaymentSuccess = async (response) => {
     try {
-      if (
-        !response.razorpay_payment_id ||
-        !response.razorpay_order_id ||
-        !response.razorpay_signature
-      ) {
-        throw new Error("Invalid payment response");
-      }
+      // Process payment with Razorpay
+      const paymentResponse = await processPayment(paymentData, {
+        name: user?.name || paymentData.user?.name,
+        email: user?.email || paymentData.user?.email,
+      });
 
       // Verify payment with backend
       const verificationData = {
-        razorpay_order_id: response.razorpay_order_id,
-        razorpay_payment_id: response.razorpay_payment_id,
-        razorpay_signature: response.razorpay_signature,
+        razorpay_order_id: paymentResponse.razorpay_order_id,
+        razorpay_payment_id: paymentResponse.razorpay_payment_id,
+        razorpay_signature: paymentResponse.razorpay_signature,
         transactionId: transactionId,
       };
 
       await verifyPayment(verificationData);
       setPaymentStatus("success");
 
-      // Redirect to dashboard after a brief delay
+      // Show success message and redirect to dashboard
       setTimeout(() => {
         navigate("/dashboard", {
           state: {
@@ -215,50 +188,24 @@ const PaymentPage = () => {
         });
       }, 2000);
     } catch (err) {
+      console.error("Payment error:", err);
       setPaymentStatus("failed");
-      setProcessingError(err.message || "Payment verification failed");
-    }
-  };
-
-  // Handle payment retry
-  const handleRetry = async () => {
-    // Clear any existing errors
-    setProcessingError(null);
-
-    // Reinitiate payment
-    await initiatePayment(planId, billingType);
-  };
-
-  // Cancel payment and go to dashboard with free plan
-  const handleCancel = async () => {
-    try {
-      // If user is from registration, activate free plan
-      if (fromRegistration) {
-        // Find free plan
-        const freePlan = plans.find((p) => p.name === "free");
-        if (freePlan) {
-          await handleFreePlan(freePlan._id);
-        } else {
-          // If no free plan found, just redirect
-          navigate("/dashboard");
-        }
-      } else {
-        navigate("/plans");
-      }
-    } catch (err) {
-      navigate("/dashboard");
+      setProcessingError(err.message || "Payment processing failed");
     }
   };
 
   // Format currency for display
   const formatCurrency = (amount, currency = "INR") => {
-    const formatter = new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 0,
-    });
+    if (!amount) return "₹0";
 
-    return formatter.format(amount / 100);
+    // If amount is in smallest unit (paise), convert to rupees
+    const adjustedAmount = amount > 1000 ? amount / 100 : amount;
+
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: currency || "INR",
+      minimumFractionDigits: 0,
+    }).format(adjustedAmount);
   };
 
   // Render appropriate UI based on payment status
@@ -267,7 +214,7 @@ const PaymentPage = () => {
       return (
         <div className="flex flex-col items-center justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-          <p className="text-gray-700">Processing your payment...</p>
+          <p className="text-gray-700">Processing your request...</p>
         </div>
       );
     }
@@ -457,7 +404,9 @@ const PaymentPage = () => {
             </h1>
             {paymentStatus === "pending" && selectedPlan && (
               <p className="mt-2 text-gray-600">
-                Please review your selected plan and proceed with payment
+                {fromRegistration
+                  ? "Complete your registration by subscribing to your selected plan"
+                  : "Upgrade your account to access premium features"}
               </p>
             )}
           </div>

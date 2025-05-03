@@ -1,5 +1,4 @@
-// src/hooks/useRazorpay.js
-
+// src/hooks/useRazorpay.js - This is an improved version with better error handling
 import { useState, useCallback } from "react";
 
 const useRazorpay = () => {
@@ -11,7 +10,7 @@ const useRazorpay = () => {
     return new Promise((resolve, reject) => {
       // Check if Razorpay is already loaded
       if (window.Razorpay) {
-        resolve(true);
+        resolve(window.Razorpay);
         return;
       }
 
@@ -20,15 +19,15 @@ const useRazorpay = () => {
       script.async = true;
 
       script.onload = () => {
-        resolve(true);
+        if (window.Razorpay) {
+          resolve(window.Razorpay);
+        } else {
+          reject(new Error("Razorpay SDK failed to load"));
+        }
       };
 
       script.onerror = () => {
-        reject(
-          new Error(
-            "Failed to load Razorpay SDK. Please check your internet connection."
-          )
-        );
+        reject(new Error("Failed to load Razorpay SDK"));
       };
 
       document.body.appendChild(script);
@@ -47,45 +46,45 @@ const useRazorpay = () => {
 
       try {
         // Load Razorpay script if not already loaded
-        await loadRazorpayScript();
-
-        const options = {
-          key: paymentData.keyId,
-          amount: paymentData.order.amount,
-          currency: paymentData.order.currency || "INR",
-          name: "Job Hunt Tracker",
-          description: "Plan Subscription",
-          order_id: paymentData.order.id,
-          prefill: {
-            name: userData?.name || "",
-            email: userData?.email || "",
-            contact: userData?.phone || "",
-          },
-          theme: {
-            color: "#3498db",
-          },
-          modal: {
-            ondismiss: function () {
-              setError("Payment cancelled by user");
-            },
-          },
-          notes: {
-            plan_id: paymentData.order.notes.planId,
-            billing_type: paymentData.order.notes.billingType,
-            transaction_id: paymentData.transaction,
-          },
-        };
+        const Razorpay = await loadRazorpayScript();
 
         return new Promise((resolve, reject) => {
-          const razorpayInstance = new window.Razorpay({
-            ...options,
-            handler: (response) => {
-              resolve(response);
+          const options = {
+            key: paymentData.keyId,
+            amount: paymentData.order.amount,
+            currency: paymentData.order.currency || "INR",
+            name: "Job Hunt Tracker",
+            description: `${
+              paymentData.order.notes?.planName || "Premium"
+            } Plan`,
+            order_id: paymentData.order.id,
+            prefill: {
+              name: userData?.name || "",
+              email: userData?.email || "",
+              contact: userData?.phone || "",
             },
+            theme: {
+              color: "#3f51b5",
+            },
+            modal: {
+              ondismiss: function () {
+                reject(new Error("Payment canceled by user"));
+              },
+            },
+            notes: {
+              plan_id: paymentData.order.notes?.planId,
+              transaction_id: paymentData.transaction,
+            },
+          };
+
+          const razorpayInstance = new Razorpay(options);
+
+          razorpayInstance.on("payment.success", function (response) {
+            resolve(response);
           });
 
-          razorpayInstance.on("payment.failed", (resp) => {
-            reject(new Error(resp.error.description || "Payment failed"));
+          razorpayInstance.on("payment.error", function (response) {
+            reject(new Error(response.error?.description || "Payment failed"));
           });
 
           razorpayInstance.open();
