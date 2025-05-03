@@ -1,10 +1,16 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useData } from "../../context/DataContext";
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
   const { user } = useAuth();
+  const { currentPlan, loadCurrentPlan } = useData();
+
+  useEffect(() => {
+    loadCurrentPlan();
+  }, [loadCurrentPlan]);
 
   // Define navigation items
   const navItems = [
@@ -83,7 +89,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="2"
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20H7m4 0v-2c0-.656-.126-1.283-.356-1.857M7 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M17 20H17"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656-.126-1.283-.356-1.857M7 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M17 20H17"
           ></path>
         </svg>
       ),
@@ -130,13 +136,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     ));
   };
 
-  // Get plan name safely with fallback to "Free"
+  // Get plan name safely from the currentPlan object
   const getPlanName = () => {
-    // Check if user exists and has currentPlan and name properties
-    if (user?.currentPlan?.name) {
+    if (currentPlan?.plan?.name) {
       return (
-        user.currentPlan.name.charAt(0).toUpperCase() +
-        user.currentPlan.name.slice(1)
+        currentPlan.plan.name.charAt(0).toUpperCase() +
+        currentPlan.plan.name.slice(1)
       );
     }
     return "Free"; // Default to "Free" if no plan is available
@@ -162,7 +167,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         <div className="flex items-center justify-between px-4 py-5 border-b">
           <div className="flex items-center">
             <span className="text-xl font-semibold text-blue-600">
-              Job Hunt Tracker
+              PursuitPal
             </span>
           </div>
           <button
@@ -211,38 +216,32 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           {renderNavItems()}
         </nav>
 
-        {/* Plan info - Only show if user and currentPlan exist */}
-        {user && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
-            <div className="bg-blue-50 p-3 rounded-md">
-              <div className="flex items-center">
-                <svg
-                  className="w-5 h-5 text-blue-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  ></path>
-                </svg>
-                <span className="ml-2 text-sm font-medium text-blue-600">
-                  {getPlanName()} Plan
-                </span>
-              </div>
-              <div className="mt-1 text-xs text-blue-500">
-                <a href="/plans" className="underline">
-                  Upgrade now
-                </a>{" "}
-                for more features
-              </div>
+        {/* Plan info */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500">Current Plan</p>
+              <p className="text-sm font-medium text-gray-800">
+                {getPlanName()} Plan
+              </p>
             </div>
+            <Link
+              to="/subscription"
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              Manage
+            </Link>
           </div>
-        )}
+          {currentPlan?.subscription && (
+            <div className="mt-1 text-xs text-gray-500">
+              {currentPlan.subscription.status === "active" ? (
+                <span className="text-green-600">● Active</span>
+              ) : (
+                <span className="text-yellow-600">● Expiring soon</span>
+              )}
+            </div>
+          )}
+        </div>
       </aside>
     </>
   );

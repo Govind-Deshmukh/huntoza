@@ -1,10 +1,78 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
+import { useData } from "../../context/DataContext";
 
 const DashboardPage = () => {
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { user } = useAuth();
+  const {
+    dashboardAnalytics,
+    loadDashboardData,
+    currentPlan,
+    loadCurrentPlan,
+  } = useData();
+
+  useEffect(() => {
+    // Load dashboard data including current plan
+    loadDashboardData();
+    loadCurrentPlan();
+  }, []);
+
+  // Simplified stats based on dashboard analytics
+  const getStats = () => {
+    if (!dashboardAnalytics) {
+      return [
+        { name: "Total Applications", value: "0", color: "blue" },
+        { name: "Active Applications", value: "0", color: "green" },
+        { name: "Interviews", value: "0", color: "purple" },
+        { name: "Offers", value: "0", color: "yellow" },
+      ];
+    }
+
+    const { applicationStats } = dashboardAnalytics;
+
+    return [
+      {
+        name: "Total Applications",
+        value: applicationStats?.total || "0",
+        color: "blue",
+      },
+      {
+        name: "Active Applications",
+        value:
+          (applicationStats?.applied || 0) +
+          (applicationStats?.screening || 0) +
+          (applicationStats?.interview || 0),
+        color: "green",
+      },
+      {
+        name: "Interviews",
+        value: applicationStats?.interview || "0",
+        color: "purple",
+      },
+      {
+        name: "Offers",
+        value: applicationStats?.offer || "0",
+        color: "yellow",
+      },
+    ];
+  };
+
+  // Get color class based on stat color
+  const getColorClass = (color) => {
+    switch (color) {
+      case "blue":
+        return "text-blue-600 bg-blue-100";
+      case "green":
+        return "text-green-600 bg-green-100";
+      case "purple":
+        return "text-purple-600 bg-purple-100";
+      case "yellow":
+        return "text-yellow-600 bg-yellow-100";
+      default:
+        return "text-gray-600 bg-gray-100";
+    }
+  };
 
   // Mock stats for demonstration
   const stats = [
