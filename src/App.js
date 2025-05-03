@@ -12,7 +12,6 @@ import ProtectedRoute from "./components/protectedRoute";
 // Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
-import SignupWithPlanPage from "./pages/auth/SignupWithPlanPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 
@@ -35,12 +34,12 @@ import ContactDetailsPage from "./pages/dashboard/ContactDetailsPage";
 import ContactFormPage from "./pages/dashboard/ContactFormPage";
 
 // Plan and Payment Pages
-import PlansPage from "./pages/plans/PlansPage";
-import PaymentPage from "./pages/plans/PaymentPage";
-import PaymentHistoryPage from "./pages/plans/PaymentHistoryPage";
-import SubscriptionPage from "./pages/plans/SubscriptionPage";
+import PaymentHistoryPage from "./pages/dashboard/PaymentHistoryPage";
+import SubscriptionPage from "./pages/dashboard/SubscriptionPage";
 import ApplicationsPage from "./pages/dashboard/ApplicationsPage";
 import JobFormPage from "./pages/dashboard/JobFormPage";
+import HomePage from "./pages/home/HomePage";
+import PaymentPage from "./pages/payment/PaymentPage";
 
 function App() {
   return (
@@ -50,11 +49,10 @@ function App() {
           <div className="min-h-screen bg-gray-50">
             <Routes>
               {/* Public Routes */}
+              <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<SignupPage />} />
-              <Route path="/register-plan" element={<SignupWithPlanPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/plans" element={<PlansPage />} />
 
               <Route
                 path="/reset-password/:token"

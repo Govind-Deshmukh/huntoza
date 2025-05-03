@@ -1,4 +1,4 @@
-// src/hooks/useRazerpay.js
+// src/hooks/useRazorpay.js
 
 import { useState, useCallback } from "react";
 
@@ -72,6 +72,7 @@ const useRazorpay = () => {
           notes: {
             plan_id: paymentData.order.notes.planId,
             billing_type: paymentData.order.notes.billingType,
+            transaction_id: paymentData.transaction,
           },
         };
 
