@@ -32,7 +32,7 @@ const SubscriptionPage = () => {
     };
 
     loadData();
-  }, [loadCurrentPlan, getPaymentHistory]);
+  }, []);
 
   const handleCancelSubscription = async () => {
     try {
