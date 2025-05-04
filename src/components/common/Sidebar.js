@@ -7,10 +7,12 @@ import { useData } from "../../context/DataContext";
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
   const { user } = useAuth();
-  const { currentPlan } = useData();
+  const { currentPlan, loadCurrentPlan } = useData();
 
-  // FIX: Remove this useEffect that was calling loadCurrentPlan on every render
-  // The plan data will be loaded by the DataContext initially
+  useEffect(() => {
+    // loadCurrentPlan();
+    console.log("Current Plan:", currentPlan);
+  }, []);
 
   // Define navigation items
   const navItems = [
