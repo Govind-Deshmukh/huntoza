@@ -4,7 +4,7 @@ WORKDIR /opt/apps/PursuitPal
 
 COPY package*.json ./
 
-RUN npm ci
+RUN npm install --production
 
 COPY . .
 
