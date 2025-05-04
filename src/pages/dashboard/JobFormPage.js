@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useData } from "../../context/DataContext";
+import ExtensionIntegration from "../../components/dashboard/ExtensionIntegration";
 
 const JobFormPage = () => {
   const navigate = useNavigate();
@@ -89,6 +90,29 @@ const JobFormPage = () => {
     } catch (error) {
       console.error("Error processing extension job data:", error);
     }
+  };
+
+  const handleExtensionData = (jobData) => {
+    // Update form with job data from extension
+    const updatedData = {
+      ...initialFormState,
+      company: jobData.company || "",
+      position: jobData.position || "",
+      jobLocation: jobData.jobLocation || "remote",
+      jobType: jobData.jobType || "full-time",
+      jobDescription: jobData.jobDescription || "",
+      jobUrl: jobData.jobUrl || "",
+      priority: jobData.priority || "medium",
+      favorite: jobData.favorite || false,
+      salary: {
+        min: jobData.salary?.min || 0,
+        max: jobData.salary?.max || 0,
+        currency: jobData.salary?.currency || "INR",
+      },
+    };
+
+    setFormData(updatedData);
+    setExtensionDataReceived(true);
   };
 
   // Load contacts for contact person dropdown
@@ -265,11 +289,9 @@ const JobFormPage = () => {
                 ? "Update your job application details"
                 : "Create a new job application to track in your job hunt"}
             </p>
-            {extensionDataReceived && (
-              <div className="mt-2 text-sm text-blue-600 bg-blue-50 p-2 rounded">
-                ℹ️ Job details have been imported from the Chrome extension.
-              </div>
-            )}
+
+            {/* Add the ExtensionIntegration component here */}
+            <ExtensionIntegration onDataReceived={handleExtensionData} />
           </div>
 
           {/* Error message */}
