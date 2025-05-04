@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// src/pages/dashboard/ApplicationsPage.js - Fixed version
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useData } from "../../context/DataContext";
@@ -26,10 +27,15 @@ const ApplicationsPage = () => {
   // Current page
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Load jobs on component mount and when filters change
-  useEffect(() => {
+  // Load jobs with defined callback to avoid infinite loop
+  const fetchJobs = useCallback(() => {
     loadJobs(filters, currentPage);
   }, [loadJobs, filters, currentPage]);
+
+  // Load jobs on component mount and when filters change
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
 
   // Handle filter changes
   const handleFilterChange = (e) => {
@@ -42,8 +48,7 @@ const ApplicationsPage = () => {
   const handleStatusChange = async (jobId, newStatus) => {
     try {
       await updateJob(jobId, { status: newStatus });
-      // Refresh jobs list
-      loadJobs(filters, currentPage);
+      // Jobs list will be updated through the context
     } catch (err) {
       console.error("Error updating job status:", err);
     }
@@ -53,8 +58,7 @@ const ApplicationsPage = () => {
   const handleToggleFavorite = async (jobId, currentFavorite) => {
     try {
       await updateJob(jobId, { favorite: !currentFavorite });
-      // Refresh jobs list
-      loadJobs(filters, currentPage);
+      // Jobs list will be updated through the context
     } catch (err) {
       console.error("Error toggling favorite:", err);
     }
@@ -67,8 +71,7 @@ const ApplicationsPage = () => {
     ) {
       try {
         await deleteJob(jobId);
-        // Refresh jobs list
-        loadJobs(filters, currentPage);
+        // Jobs list will be updated through the context
       } catch (err) {
         console.error("Error deleting job:", err);
       }
@@ -355,31 +358,6 @@ const ApplicationsPage = () => {
                   <option value="rejected">Rejected</option>
                   <option value="withdrawn">Withdrawn</option>
                   <option value="saved">Saved</option>
-                </select>
-              </div>
-
-              {/* Job Type filter */}
-              <div>
-                <label
-                  htmlFor="jobType"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Job Type
-                </label>
-                <select
-                  id="jobType"
-                  name="jobType"
-                  value={filters.jobType}
-                  onChange={handleFilterChange}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 sm:text-sm"
-                >
-                  <option value="all">All Types</option>
-                  <option value="full-time">Full Time</option>
-                  <option value="part-time">Part Time</option>
-                  <option value="contract">Contract</option>
-                  <option value="internship">Internship</option>
-                  <option value="remote">Remote</option>
-                  <option value="other">Other</option>
                 </select>
               </div>
 

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// src/pages/dashboard/TasksPage.js - Fixed version
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useData } from "../../context/DataContext";
@@ -27,10 +28,15 @@ const TasksPage = () => {
   // Current page
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Load tasks on component mount and when filters change
-  useEffect(() => {
+  // Load tasks with defined callback to prevent infinite loop
+  const fetchTasks = useCallback(() => {
     loadTasks(filters, currentPage);
   }, [loadTasks, filters, currentPage]);
+
+  // Load tasks on component mount and when filters or page changes
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
   // Handle filter changes
   const handleFilterChange = (e) => {
@@ -43,8 +49,7 @@ const TasksPage = () => {
   const handleCompleteTask = async (taskId) => {
     try {
       await completeTask(taskId);
-      // Refresh the tasks list to show updated status
-      loadTasks(filters, currentPage);
+      // The tasks list will be updated through the context
     } catch (err) {
       console.error("Error completing task:", err);
     }
@@ -55,8 +60,7 @@ const TasksPage = () => {
     if (window.confirm("Are you sure you want to delete this task?")) {
       try {
         await deleteTask(taskId);
-        // Refresh the task list
-        loadTasks(filters, currentPage);
+        // The tasks list will be updated through the context
       } catch (err) {
         console.error("Error deleting task:", err);
       }
@@ -117,7 +121,7 @@ const TasksPage = () => {
 
   // Format category for display
   const formatCategory = (category) => {
-    if (!category) return "";
+    if (!category) return "Not categorized";
     return category
       .split("-")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -533,7 +537,7 @@ const TasksPage = () => {
                             </div>
                             <div className="mt-1 flex items-center">
                               {task.category && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 mr-2">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 mr-2">
                                   {formatCategory(task.category)}
                                 </span>
                               )}

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// Enhanced ProfilePage.js
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
 
@@ -8,8 +9,8 @@ const ProfilePage = () => {
 
   // Profile form state
   const [profileForm, setProfileForm] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
+    name: "",
+    email: "",
   });
 
   // Password form state
@@ -23,6 +24,16 @@ const ProfilePage = () => {
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+
+  // Initialize form data with user data when available
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        name: user.name || "",
+        email: user.email || "",
+      });
+    }
+  }, [user]); // Only re-run when user changes
 
   // Handle profile form changes
   const handleProfileChange = (e) => {
@@ -52,6 +63,7 @@ const ProfilePage = () => {
       setProfileSuccess(true);
     } catch (err) {
       // Error is handled in AuthContext
+      console.error("Profile update error:", err);
     }
   };
 
@@ -80,6 +92,7 @@ const ProfilePage = () => {
       });
     } catch (err) {
       // Error is handled in AuthContext
+      console.error("Password update error:", err);
     }
   };
 
@@ -258,7 +271,7 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* Subscription Info */}
+          {/* Sidebar - Subscription Info */}
           <div>
             <div className="bg-white shadow rounded-lg">
               <div className="px-6 py-4 border-b border-gray-200">
@@ -320,23 +333,6 @@ const ProfilePage = () => {
                       </svg>
                       <span className="ml-2 text-sm text-gray-600">
                         Basic task management
-                      </span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg
-                        className="flex-shrink-0 h-5 w-5 text-green-500"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <span className="ml-2 text-sm text-gray-600">
-                        Standard dashboard
                       </span>
                     </li>
                   </ul>
