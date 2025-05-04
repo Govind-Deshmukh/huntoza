@@ -7,6 +7,11 @@ import React, {
 } from "react";
 import * as authService from "../services/authService";
 import { setAuthToken } from "../utils/axiosConfig";
+import {
+  showSuccessToast,
+  showErrorToast,
+  handleApiError,
+} from "../utils/toastUtils";
 
 const AuthContext = createContext();
 
@@ -39,6 +44,7 @@ export const AuthProvider = ({ children }) => {
       // Token might be invalid, clear it
       setAuthToken(null);
       console.error("Error loading user:", err);
+      // Don't show a toast for this since it might be a normal session expiration
     } finally {
       setIsLoading(false);
     }
@@ -50,54 +56,72 @@ export const AuthProvider = ({ children }) => {
   }, [loadUserFromToken]);
 
   // Register user
-  const register = useCallback(async (userData) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const register = useCallback(
+    async (userData) => {
+      try {
+        setIsLoading(true);
+        clearError();
 
-      const data = await authService.register(userData);
-      setUser(data.user);
-      setIsAuthenticated(true);
-      return data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Registration failed");
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+        const data = await authService.register(userData);
+        setUser(data.user);
+        setIsAuthenticated(true);
+
+        showSuccessToast("Account created successfully!");
+        return data;
+      } catch (err) {
+        const errorMessage =
+          err.response?.data?.message || "Registration failed";
+        setError(errorMessage);
+        handleApiError(err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError]
+  );
 
   // Login user
-  const login = useCallback(async (email, password) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const login = useCallback(
+    async (email, password) => {
+      try {
+        setIsLoading(true);
+        clearError();
 
-      const data = await authService.login(email, password);
+        const data = await authService.login(email, password);
 
-      // Store refresh token in localStorage if it's returned
-      if (data.refreshToken) {
-        localStorage.setItem("refreshToken", data.refreshToken);
+        // Store refresh token in localStorage if it's returned
+        if (data.refreshToken) {
+          localStorage.setItem("refreshToken", data.refreshToken);
+        }
+
+        setUser(data.user);
+        setIsAuthenticated(true);
+
+        showSuccessToast(`Welcome back, ${data.user.name || "User"}!`);
+        return data;
+      } catch (err) {
+        const errorMessage =
+          err.response?.data?.message || "Invalid credentials";
+        setError(errorMessage);
+        handleApiError(err);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
-
-      setUser(data.user);
-      setIsAuthenticated(true);
-      return data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Invalid credentials");
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [clearError]
+  );
 
   // Logout user
   const logout = useCallback(async () => {
     try {
       setIsLoading(true);
       await authService.logout();
+      showSuccessToast("Logged out successfully");
     } catch (err) {
       console.error("Logout error:", err);
+      // Still proceed with local logout even if API call fails
     } finally {
       setUser(null);
       setIsAuthenticated(false);
@@ -107,48 +131,63 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Forgot password
-  const forgotPassword = useCallback(async (email) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      return await authService.forgotPassword(email);
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to process request");
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const forgotPassword = useCallback(
+    async (email) => {
+      try {
+        setIsLoading(true);
+        clearError();
+        const result = await authService.forgotPassword(email);
+        showSuccessToast("Password reset instructions sent to your email");
+        return result;
+      } catch (err) {
+        const errorMessage =
+          err.response?.data?.message || "Failed to process request";
+        setError(errorMessage);
+        handleApiError(err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError]
+  );
 
   // Reset password
-  const resetPassword = useCallback(async (token, password) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const resetPassword = useCallback(
+    async (token, password) => {
+      try {
+        setIsLoading(true);
+        clearError();
 
-      const data = await authService.resetPassword(token, password);
+        const data = await authService.resetPassword(token, password);
 
-      // If token is returned, user is automatically logged in
-      if (data.token) {
-        // Store refresh token in localStorage if it's returned
-        if (data.refreshToken) {
-          localStorage.setItem("refreshToken", data.refreshToken);
+        // If token is returned, user is automatically logged in
+        if (data.token) {
+          // Store refresh token in localStorage if it's returned
+          if (data.refreshToken) {
+            localStorage.setItem("refreshToken", data.refreshToken);
+          }
+
+          // Get updated user profile
+          const userData = await authService.getCurrentUser();
+          setUser(userData);
+          setIsAuthenticated(true);
+          showSuccessToast("Password reset successful!");
         }
 
-        // Get updated user profile
-        const userData = await authService.getCurrentUser();
-        setUser(userData);
-        setIsAuthenticated(true);
+        return data;
+      } catch (err) {
+        const errorMessage =
+          err.response?.data?.message || "Failed to reset password";
+        setError(errorMessage);
+        handleApiError(err);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
-
-      return data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to reset password");
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [clearError]
+  );
 
   // Check reset token validity
   const checkResetToken = useCallback(async (token) => {
@@ -156,6 +195,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(true);
       return await authService.checkResetToken(token);
     } catch (err) {
+      // Don't show toast for this validation check
       return false;
     } finally {
       setIsLoading(false);
@@ -163,47 +203,61 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Update user profile
-  const updateProfile = useCallback(async (profileData) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const updateProfile = useCallback(
+    async (profileData) => {
+      try {
+        setIsLoading(true);
+        clearError();
 
-      const data = await authService.updateProfile(profileData);
-      setUser(data.user);
+        const data = await authService.updateProfile(profileData);
+        setUser(data.user);
+        showSuccessToast("Profile updated successfully!");
 
-      return data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to update profile");
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+        return data;
+      } catch (err) {
+        const errorMessage =
+          err.response?.data?.message || "Failed to update profile";
+        setError(errorMessage);
+        handleApiError(err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError]
+  );
 
   // Update password
-  const updatePassword = useCallback(async (currentPassword, newPassword) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const updatePassword = useCallback(
+    async (currentPassword, newPassword) => {
+      try {
+        setIsLoading(true);
+        clearError();
 
-      const data = await authService.updatePassword(
-        currentPassword,
-        newPassword
-      );
+        const data = await authService.updatePassword(
+          currentPassword,
+          newPassword
+        );
 
-      // Store refresh token in localStorage if it's returned
-      if (data.refreshToken) {
-        localStorage.setItem("refreshToken", data.refreshToken);
+        // Store refresh token in localStorage if it's returned
+        if (data.refreshToken) {
+          localStorage.setItem("refreshToken", data.refreshToken);
+        }
+
+        showSuccessToast("Password updated successfully!");
+        return data;
+      } catch (err) {
+        const errorMessage =
+          err.response?.data?.message || "Failed to update password";
+        setError(errorMessage);
+        handleApiError(err);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
-
-      return data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to update password");
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [clearError]
+  );
 
   // Refresh user token
   const refreshToken = useCallback(async () => {
@@ -232,6 +286,8 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem("refreshToken");
+
+      // Don't show toast for token refresh issues as they're handled elsewhere
       throw err;
     }
   }, []);
