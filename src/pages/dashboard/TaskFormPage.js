@@ -104,6 +104,13 @@ const TaskFormPage = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
+    let newValue = value;
+
+    // Normalize empty strings for relatedContact or relatedJob to null
+    if ((name === "relatedContact" || name === "relatedJob") && value === "") {
+      newValue = null;
+    }
+
     // Clear validation error for this field
     if (validationErrors[name]) {
       setValidationErrors((prev) => {
@@ -120,7 +127,7 @@ const TaskFormPage = () => {
 
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: newValue,
     }));
   };
 
@@ -146,12 +153,20 @@ const TaskFormPage = () => {
       return;
     }
 
+    // Create a copy of formData and sanitize it
+    const sanitizedData = {
+      ...formData,
+      relatedContact:
+        formData.relatedContact === "" ? null : formData.relatedContact,
+      relatedJob: formData.relatedJob === "" ? null : formData.relatedJob, // Optional
+    };
+
     try {
       if (isEditMode) {
-        await updateTask(id, formData);
+        await updateTask(id, sanitizedData);
         setSuccessMessage("Task updated successfully!");
       } else {
-        await createTask(formData);
+        await createTask(sanitizedData);
         setSuccessMessage("Task created successfully!");
         setFormData(initialFormState);
       }

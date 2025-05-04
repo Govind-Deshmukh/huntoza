@@ -34,7 +34,7 @@ const JobFormPage = () => {
       max: 0,
       currency: "INR",
     },
-    applicationDate: new Date().toISOString().slice(0, 10), // Today's date in YYYY-MM-DD format
+    applicationDate: new Date().toISOString().slice(0, 10),
     contactPerson: null,
     notes: "",
     documents: {
@@ -171,6 +171,7 @@ const JobFormPage = () => {
     if (!validateForm()) {
       return;
     }
+
     if (!formData.contactPerson) {
       formData.contactPerson = null;
     }
