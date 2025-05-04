@@ -12,9 +12,12 @@ RUN npm run prod
 
 FROM node:20-alpine as prod
 
+ENV NODE_ENV=production
+ENV REACT_APP_API_URL=https://pursuitpal.app/api/v1
+ENV GENERATE_SOURCEMAP=false
+
 WORKDIR /opt/apps/PursuitPal/ui
 
-ENV GENERATE_SOURCEMAP=false
 
 COPY --from=build /opt/apps/PursuitPal/build /opt/apps/PursuitPal/ui
 
