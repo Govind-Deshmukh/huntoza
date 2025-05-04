@@ -1,5 +1,5 @@
-// Enhanced DashboardPage with API integration
-import React, { useEffect, useState } from "react";
+// Enhanced DashboardPage with API integration - Fixed version
+import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
@@ -11,7 +11,6 @@ const DashboardPage = () => {
     dashboardAnalytics,
     loadDashboardData,
     currentPlan,
-    loadCurrentPlan,
     jobs,
     loadJobs,
     tasks,
@@ -22,22 +21,34 @@ const DashboardPage = () => {
 
   const [recentApplications, setRecentApplications] = useState([]);
   const [upcomingTasks, setUpcomingTasks] = useState([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  useEffect(() => {
-    // Load all necessary data for dashboard
-    const loadDashboardContent = async () => {
+  // FIX: Use a callback for loading all dashboard data
+  const initializeDashboard = useCallback(async () => {
+    // Skip if already initialized
+    if (isInitialized) return;
+
+    try {
+      // Load dashboard data
       await loadDashboardData();
-      await loadCurrentPlan();
 
       // Load recent jobs with limit
       await loadJobs({ sort: "newest" }, 1, 4);
 
       // Load upcoming tasks with custom filters
       await loadTasks({ status: "pending", sort: "dueDate-asc" }, 1, 3);
-    };
 
-    loadDashboardContent();
-  }, [loadDashboardData, loadCurrentPlan, loadJobs, loadTasks]);
+      // Mark as initialized to prevent repeated loading
+      setIsInitialized(true);
+    } catch (err) {
+      console.error("Error initializing dashboard:", err);
+    }
+  }, [loadDashboardData, loadJobs, loadTasks, isInitialized]);
+
+  // FIX: Only load data once on component mount
+  useEffect(() => {
+    initializeDashboard();
+  }, [initializeDashboard]);
 
   // Process jobs data for display
   useEffect(() => {

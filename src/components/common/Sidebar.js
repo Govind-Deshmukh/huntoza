@@ -1,3 +1,4 @@
+// src/components/common/Sidebar.js - Fixed version
 import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -6,11 +7,10 @@ import { useData } from "../../context/DataContext";
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
   const { user } = useAuth();
-  const { currentPlan, loadCurrentPlan } = useData();
+  const { currentPlan } = useData();
 
-  useEffect(() => {
-    loadCurrentPlan();
-  }, [loadCurrentPlan]);
+  // FIX: Remove this useEffect that was calling loadCurrentPlan on every render
+  // The plan data will be loaded by the DataContext initially
 
   // Define navigation items
   const navItems = [

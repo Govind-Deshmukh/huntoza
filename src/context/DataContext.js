@@ -1,10 +1,10 @@
-// src/context/EnhancedDataContext.js
 import React, {
   createContext,
   useState,
   useCallback,
   useContext,
   useEffect,
+  useMemo,
 } from "react";
 import { useAuth } from "./AuthContext";
 import useCurrentPlan from "../hooks/useCurrentPlans";
@@ -31,7 +31,6 @@ export const DataProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Jobs state
   const [jobs, setJobs] = useState([]);
   const [jobStats, setJobStats] = useState({
     total: 0,
@@ -76,19 +75,13 @@ export const DataProvider = ({ children }) => {
   const [plans, setPlans] = useState([]);
 
   // Use the safe current plan hook instead of state + useEffect
-  const currentPlan = useCurrentPlan(isAuthenticated);
+  const currentPlanData = useCurrentPlan(isAuthenticated);
 
   // Initialize access control with current plan
-  const [accessControl, setAccessControl] = useState(
-    new AccessControl(currentPlan)
+  const accessControl = useMemo(
+    () => new AccessControl(currentPlanData),
+    [currentPlanData]
   );
-
-  // Update access control when current plan changes
-  useEffect(() => {
-    if (currentPlan) {
-      setAccessControl(new AccessControl(currentPlan));
-    }
-  }, [currentPlan]);
 
   // Analytics state
   const [dashboardAnalytics, setDashboardAnalytics] = useState(null);
@@ -142,17 +135,17 @@ export const DataProvider = ({ children }) => {
     }
   }, [clearError]);
 
-  // Use the refreshPlan method from our hook
   const loadCurrentPlan = useCallback(async () => {
     if (!isAuthenticated) return null;
     try {
-      await currentPlan.refreshPlan();
-      return currentPlan;
+      // FIX: Use refreshPlan from our hook
+      const refreshedPlan = await currentPlanData.refreshPlan();
+      return refreshedPlan;
     } catch (err) {
       handleApiError(err);
       return null;
     }
-  }, [isAuthenticated, currentPlan]);
+  }, [isAuthenticated, currentPlanData]);
 
   // === JOBS OPERATIONS ===
   const loadJobs = useCallback(
@@ -185,7 +178,6 @@ export const DataProvider = ({ children }) => {
     },
     [isAuthenticated, clearError]
   );
-
   const getJobById = useCallback(
     async (jobId) => {
       if (!isAuthenticated) return null;
@@ -220,7 +212,7 @@ export const DataProvider = ({ children }) => {
         );
         if (!canCreate) {
           throw new Error(
-            `You've reached the job applications limit for your ${currentPlan.plan.name} plan`
+            `You've reached the job applications limit for your ${currentPlanData.plan.name} plan`
           );
         }
 
@@ -258,7 +250,7 @@ export const DataProvider = ({ children }) => {
       jobs.length,
       jobsPagination.totalItems,
       accessControl,
-      currentPlan.plan.name,
+      currentPlanData.plan.name,
     ]
   );
 
@@ -677,7 +669,7 @@ export const DataProvider = ({ children }) => {
         );
         if (!canCreate) {
           throw new Error(
-            `You've reached the contacts limit for your ${currentPlan.plan.name} plan`
+            `You've reached the contacts limit for your ${currentPlanData.plan.name} plan`
           );
         }
 
@@ -715,7 +707,7 @@ export const DataProvider = ({ children }) => {
       contacts.length,
       contactsPagination.totalItems,
       accessControl,
-      currentPlan.plan.name,
+      currentPlanData.plan.name,
     ]
   );
 
@@ -963,7 +955,7 @@ export const DataProvider = ({ children }) => {
 
         // If the plan is free, update current plan immediately
         if (result.nextStep !== "payment") {
-          await currentPlan.refreshPlan();
+          await currentPlanData.refreshPlan();
           showSuccessToast("Plan upgraded successfully!");
         }
 
@@ -978,7 +970,7 @@ export const DataProvider = ({ children }) => {
         setIsLoading(false);
       }
     },
-    [isAuthenticated, clearError, currentPlan]
+    [isAuthenticated, clearError, currentPlanData]
   );
 
   // Create payment order
@@ -1036,7 +1028,7 @@ export const DataProvider = ({ children }) => {
         const response = await paymentService.verifyPayment(paymentData);
 
         // Refresh current plan after successful payment
-        await currentPlan.refreshPlan();
+        await currentPlanData.refreshPlan();
         showSuccessToast("Payment verified successfully!");
 
         return response;
@@ -1047,7 +1039,7 @@ export const DataProvider = ({ children }) => {
             await refreshToken();
             // Retry the request after refresh
             const response = await paymentService.verifyPayment(paymentData);
-            await currentPlan.refreshPlan();
+            await currentPlanData.refreshPlan();
             showSuccessToast("Payment verified successfully!");
             return response;
           } catch (refreshErr) {
@@ -1065,7 +1057,7 @@ export const DataProvider = ({ children }) => {
         setIsLoading(false);
       }
     },
-    [isAuthenticated, clearError, currentPlan, refreshToken]
+    [isAuthenticated, clearError, currentPlanData, refreshToken]
   );
 
   // Get payment history
@@ -1113,7 +1105,7 @@ export const DataProvider = ({ children }) => {
       await planService.cancelSubscription();
 
       // Refresh current plan
-      await currentPlan.refreshPlan();
+      await currentPlanData.refreshPlan();
       showSuccessToast("Subscription cancelled successfully!");
 
       return true;
@@ -1124,7 +1116,7 @@ export const DataProvider = ({ children }) => {
           await refreshToken();
           // Retry the request after refresh
           await planService.cancelSubscription();
-          await currentPlan.refreshPlan();
+          await currentPlanData.refreshPlan();
           showSuccessToast("Subscription cancelled successfully!");
           return true;
         } catch (refreshErr) {
@@ -1141,68 +1133,118 @@ export const DataProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, clearError, currentPlan, refreshToken]);
+  }, [isAuthenticated, clearError, currentPlanData, refreshToken]);
 
   // Context value
-  const contextValue = {
-    // State
-    isLoading,
-    error,
-    jobs,
-    jobStats,
-    jobsPagination,
-    tasks,
-    taskStats,
-    tasksPagination,
-    contacts,
-    contactsPagination,
-    plans,
-    currentPlan,
-    dashboardAnalytics,
-    accessControl,
+  const contextValue = useMemo(
+    () => ({
+      // State
+      isLoading,
+      error,
+      jobs,
+      jobStats,
+      jobsPagination,
+      tasks,
+      taskStats,
+      tasksPagination,
+      contacts,
+      contactsPagination,
+      plans,
+      currentPlan: currentPlanData,
+      dashboardAnalytics,
+      accessControl,
 
-    // Methods
-    clearError,
-    loadDashboardData,
-    loadPlans,
-    loadCurrentPlan,
+      // Methods
+      clearError,
+      loadDashboardData,
+      loadPlans,
+      loadCurrentPlan,
 
-    // Jobs methods
-    loadJobs,
-    getJobById,
-    createJob,
-    updateJob,
-    deleteJob,
-    addInterview,
-    updateInterview,
-    deleteInterview,
+      // Jobs methods
+      loadJobs,
+      getJobById,
+      createJob,
+      updateJob,
+      deleteJob,
+      addInterview,
+      updateInterview,
+      deleteInterview,
 
-    // Tasks methods
-    loadTasks,
-    getTaskById,
-    createTask,
-    updateTask,
-    completeTask,
-    deleteTask,
+      // Tasks methods
+      loadTasks,
+      getTaskById,
+      createTask,
+      updateTask,
+      completeTask,
+      deleteTask,
 
-    // Contacts methods
-    loadContacts,
-    getContactById,
-    createContact,
-    updateContact,
-    deleteContact,
-    toggleContactFavorite,
-    addInteraction,
-    updateInteraction,
-    deleteInteraction,
+      // Contacts methods
+      loadContacts,
+      getContactById,
+      createContact,
+      updateContact,
+      deleteContact,
+      toggleContactFavorite,
+      addInteraction,
+      updateInteraction,
+      deleteInteraction,
 
-    // Payment & Plans methods
-    initiatePlanUpgrade,
-    createPaymentOrder,
-    verifyPayment,
-    getPaymentHistory,
-    cancelSubscription,
-  };
+      // Payment & Plans methods
+      initiatePlanUpgrade,
+      createPaymentOrder,
+      verifyPayment,
+      getPaymentHistory,
+      cancelSubscription,
+    }),
+    [
+      isLoading,
+      error,
+      jobs,
+      jobStats,
+      jobsPagination,
+      tasks,
+      taskStats,
+      tasksPagination,
+      contacts,
+      contactsPagination,
+      plans,
+      currentPlanData,
+      dashboardAnalytics,
+      accessControl,
+      clearError,
+      loadDashboardData,
+      loadPlans,
+      loadCurrentPlan,
+      loadJobs,
+      getJobById,
+      createJob,
+      updateJob,
+      deleteJob,
+      addInterview,
+      updateInterview,
+      deleteInterview,
+      loadTasks,
+      getTaskById,
+      createTask,
+      updateTask,
+      completeTask,
+      deleteTask,
+      loadContacts,
+      getContactById,
+      createContact,
+      updateContact,
+      deleteContact,
+      toggleContactFavorite,
+      addInteraction,
+      updateInteraction,
+      deleteInteraction,
+      initiatePlanUpgrade,
+      createPaymentOrder,
+      verifyPayment,
+      getPaymentHistory,
+      cancelSubscription,
+    ]
+  );
 
   return (
     <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>
