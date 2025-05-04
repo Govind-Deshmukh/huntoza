@@ -1,9 +1,10 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "PursuitPal",
+  "name": "PursuitPal - Job Hunt Tracker",
+  "description": "Organize your job search with PursuitPal. Track applications, manage interviews, and monitor progress.",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "favicon.png",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     },
@@ -16,10 +17,30 @@
       "src": "logo512.png",
       "type": "image/png",
       "sizes": "512x512"
+    },
+    {
+      "src": "favicon.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#3B82F6",
+  "background_color": "#F9FAFB",
+  "orientation": "portrait",
+  "categories": ["productivity", "tools", "job hunting", "career"],
+  "screenshots": [
+    {
+      "src": "assets/images/dashboard.png",
+      "type": "image/png",
+      "sizes": "1280x720"
+    },
+    {
+      "src": "assets/images/dashboard.png",
+      "type": "image/png",
+      "sizes": "1280x720"
+    }
+  ]
 }

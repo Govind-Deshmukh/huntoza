@@ -1,3 +1,16 @@
-# https://www.robotstxt.org/robotstxt.html
+# Allow all web crawlers to index the site
 User-agent: *
-Disallow:
+Allow: /
+
+# Don't allow crawlers to index auth pages
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /payment
+
+# Disallow access to API endpoints
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://pursuitpal.app/sitemap.xml

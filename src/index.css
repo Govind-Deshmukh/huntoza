@@ -1,3 +1,182 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Form Input Field CSS Fixes */
+
+/* Base styles for all input types */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="time"],
+input[type="week"],
+select,
+textarea {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0; /* border-gray-300 */
+  border-radius: 0.375rem; /* rounded-md */
+  background-color: #fff;
+  color: #1a202c; /* text-gray-900 */
+  font-size: 0.875rem; /* text-sm */
+  line-height: 1.5;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* Focus states */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #3b82f6; /* border-blue-500 */
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); /* ring-2 ring-blue-500 ring-opacity-25 */
+}
+
+/* Placeholder styling */
+::placeholder {
+  color: #a0aec0; /* text-gray-400 */
+}
+
+/* Checkbox and radio inputs */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.5rem;
+  color: #3b82f6; /* text-blue-600 */
+  border: 1px solid #e2e8f0; /* border-gray-300 */
+  border-radius: 0.25rem;
+}
+
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+/* Select dropdown styling */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Textarea specific styles */
+textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+/* Disabled state */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background-color: #f7fafc; /* bg-gray-50 */
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Form groups - add consistent spacing */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+/* Label styling */
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #4a5568; /* text-gray-700 */
+}
+
+/* Error state */
+input.error,
+select.error,
+textarea.error {
+  border-color: #f56565; /* border-red-500 */
+}
+
+/* Form layout utilities */
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -0.5rem;
+  margin-left: -0.5rem;
+}
+
+.form-col {
+  flex: 0 0 100%;
+  max-width: 100%;
+  padding-right: 0.5rem;
+  padding-left: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .form-col-sm-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+}
+
+/* Fix for date/time inputs */
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="time"],
+input[type="week"] {
+  appearance: none;
+}
+
+/* Fix for specific layouts in your project */
+.rounded-md {
+  border-radius: 0.375rem;
+}
+
+.shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Fix for specific input containers */
+.relative.rounded-md.shadow-sm {
+  position: relative;
+  width: 100%;
+  display: block;
+}
+
+/* Fix for input groups */
+.input-group {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  width: 100%;
+}
+
+.input-group > input {
+  position: relative;
+  flex: 1 1 auto;
+  width: 1%;
+  min-width: 0;
+}
+
+/* Fix for inconsistent heights in your project */
+.py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.px-3 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
