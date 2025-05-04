@@ -1,4 +1,6 @@
-import React, { useEffect } from "react";
+// Enhanced DashboardPage with API integration
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
@@ -10,211 +12,223 @@ const DashboardPage = () => {
     loadDashboardData,
     currentPlan,
     loadCurrentPlan,
+    jobs,
+    loadJobs,
+    tasks,
+    loadTasks,
+    isLoading,
+    error,
   } = useData();
 
-  useEffect(() => {
-    // Load dashboard data including current plan
-    loadDashboardData();
-    loadCurrentPlan();
-  }, []);
+  const [recentApplications, setRecentApplications] = useState([]);
+  const [upcomingTasks, setUpcomingTasks] = useState([]);
 
-  // Simplified stats based on dashboard analytics
-  const getStats = () => {
-    if (!dashboardAnalytics) {
+  useEffect(() => {
+    // Load all necessary data for dashboard
+    const loadDashboardContent = async () => {
+      await loadDashboardData();
+      await loadCurrentPlan();
+
+      // Load recent jobs with limit
+      await loadJobs({ sort: "newest" }, 1, 4);
+
+      // Load upcoming tasks with custom filters
+      await loadTasks({ status: "pending", sort: "dueDate-asc" }, 1, 3);
+    };
+
+    loadDashboardContent();
+  }, [loadDashboardData, loadCurrentPlan, loadJobs, loadTasks]);
+
+  // Process jobs data for display
+  useEffect(() => {
+    if (jobs && jobs.length > 0) {
+      const formattedJobs = jobs.map((job) => ({
+        id: job._id,
+        company: job.company,
+        position: job.position,
+        date: new Date(job.applicationDate).toISOString().slice(0, 10),
+        status: job.status.charAt(0).toUpperCase() + job.status.slice(1),
+        statusColor: getStatusColor(job.status),
+      }));
+      setRecentApplications(formattedJobs);
+    }
+  }, [jobs]);
+
+  // Process tasks data for display
+  useEffect(() => {
+    if (tasks && tasks.length > 0) {
+      const formattedTasks = tasks.map((task) => ({
+        id: task._id,
+        title: task.title,
+        date: formatTaskDate(task.dueDate),
+        type: formatTaskCategory(task.category),
+      }));
+      setUpcomingTasks(formattedTasks);
+    }
+  }, [tasks]);
+
+  // Helper function to format task date for display
+  const formatTaskDate = (dateString) => {
+    if (!dateString) return "No due date";
+
+    const dueDate = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (dueDate.toDateString() === today.toDateString()) {
+      return (
+        "Today, " +
+        dueDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      );
+    } else if (dueDate.toDateString() === tomorrow.toDateString()) {
+      return (
+        "Tomorrow, " +
+        dueDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      );
+    } else {
+      return dueDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  };
+
+  // Helper function to format task category
+  const formatTaskCategory = (category) => {
+    if (!category) return "Task";
+
+    const categoryMap = {
+      application: "Application",
+      networking: "Networking",
+      "interview-prep": "Interview",
+      "follow-up": "Follow-up",
+      "skill-development": "Learning",
+      other: "Task",
+    };
+
+    return categoryMap[category] || "Task";
+  };
+
+  // Helper function to get status color
+  const getStatusColor = (status) => {
+    const colorMap = {
+      applied: "bg-blue-100 text-blue-800",
+      screening: "bg-purple-100 text-purple-800",
+      interview: "bg-yellow-100 text-yellow-800",
+      offer: "bg-green-100 text-green-800",
+      rejected: "bg-red-100 text-red-800",
+      withdrawn: "bg-gray-100 text-gray-800",
+      saved: "bg-indigo-100 text-indigo-800",
+    };
+
+    return colorMap[status] || "bg-gray-100 text-gray-800";
+  };
+
+  // Get analytics stats from real data
+  const getAnalyticsStats = () => {
+    if (!dashboardAnalytics || !dashboardAnalytics.applicationStats) {
       return [
-        { name: "Total Applications", value: "0", color: "blue" },
-        { name: "Active Applications", value: "0", color: "green" },
-        { name: "Interviews", value: "0", color: "purple" },
-        { name: "Offers", value: "0", color: "yellow" },
+        { name: "Total Applications", value: "0", icon: applicationIcon() },
+        { name: "Active Applications", value: "0", icon: activeIcon() },
+        { name: "Interviews", value: "0", icon: interviewIcon() },
+        { name: "Offers", value: "0", icon: offerIcon() },
       ];
     }
 
-    const { applicationStats } = dashboardAnalytics;
+    const stats = dashboardAnalytics.applicationStats;
+
+    // Calculate active applications (applied + screening + interview)
+    const activeApps =
+      (stats.applied || 0) + (stats.screening || 0) + (stats.interview || 0);
 
     return [
       {
         name: "Total Applications",
-        value: applicationStats?.total || "0",
-        color: "blue",
+        value: stats.total || "0",
+        icon: applicationIcon(),
       },
-      {
-        name: "Active Applications",
-        value:
-          (applicationStats?.applied || 0) +
-          (applicationStats?.screening || 0) +
-          (applicationStats?.interview || 0),
-        color: "green",
-      },
+      { name: "Active Applications", value: activeApps, icon: activeIcon() },
       {
         name: "Interviews",
-        value: applicationStats?.interview || "0",
-        color: "purple",
+        value: stats.interview || "0",
+        icon: interviewIcon(),
       },
-      {
-        name: "Offers",
-        value: applicationStats?.offer || "0",
-        color: "yellow",
-      },
+      { name: "Offers", value: stats.offer || "0", icon: offerIcon() },
     ];
   };
 
-  // Get color class based on stat color
-  const getColorClass = (color) => {
-    switch (color) {
-      case "blue":
-        return "text-blue-600 bg-blue-100";
-      case "green":
-        return "text-green-600 bg-green-100";
-      case "purple":
-        return "text-purple-600 bg-purple-100";
-      case "yellow":
-        return "text-yellow-600 bg-yellow-100";
-      default:
-        return "text-gray-600 bg-gray-100";
-    }
-  };
+  // Icon components
+  const applicationIcon = () => (
+    <svg
+      className="w-6 h-6 text-blue-600"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+      ></path>
+    </svg>
+  );
 
-  // Mock stats for demonstration
-  const stats = [
-    {
-      name: "Total Applications",
-      value: "24",
-      icon: (
-        <svg
-          className="w-6 h-6 text-blue-600"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          ></path>
-        </svg>
-      ),
-    },
-    {
-      name: "Active Applications",
-      value: "10",
-      icon: (
-        <svg
-          className="w-6 h-6 text-green-600"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-          ></path>
-        </svg>
-      ),
-    },
-    {
-      name: "Interviews Scheduled",
-      value: "4",
-      icon: (
-        <svg
-          className="w-6 h-6 text-purple-600"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          ></path>
-        </svg>
-      ),
-    },
-    {
-      name: "Offers",
-      value: "1",
-      icon: (
-        <svg
-          className="w-6 h-6 text-yellow-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
-          ></path>
-        </svg>
-      ),
-    },
-  ];
+  const activeIcon = () => (
+    <svg
+      className="w-6 h-6 text-green-600"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+      ></path>
+    </svg>
+  );
 
-  // Recent applications (mock data)
-  const recentApplications = [
-    {
-      id: 1,
-      company: "Acme Inc",
-      position: "Frontend Developer",
-      date: "2023-04-10",
-      status: "Applied",
-      statusColor: "bg-blue-100 text-blue-800",
-    },
-    {
-      id: 2,
-      company: "Tech Solutions",
-      position: "Full Stack Engineer",
-      date: "2023-04-08",
-      status: "Phone Screen",
-      statusColor: "bg-purple-100 text-purple-800",
-    },
-    {
-      id: 3,
-      company: "Global Systems",
-      position: "React Developer",
-      date: "2023-04-05",
-      status: "Interview",
-      statusColor: "bg-yellow-100 text-yellow-800",
-    },
-    {
-      id: 4,
-      company: "InnovateCorp",
-      position: "UI/UX Developer",
-      date: "2023-04-01",
-      status: "Offer",
-      statusColor: "bg-green-100 text-green-800",
-    },
-  ];
+  const interviewIcon = () => (
+    <svg
+      className="w-6 h-6 text-purple-600"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+      ></path>
+    </svg>
+  );
 
-  // Upcoming tasks (mock data)
-  const upcomingTasks = [
-    {
-      id: 1,
-      title: "Interview with Acme Inc",
-      date: "Today, 2:00 PM",
-      type: "Interview",
-    },
-    {
-      id: 2,
-      title: "Follow up with Tech Solutions",
-      date: "Tomorrow, 10:00 AM",
-      type: "Follow-up",
-    },
-    {
-      id: 3,
-      title: "Update resume for Senior position",
-      date: "Apr 15, 2023",
-      type: "Task",
-    },
-  ];
+  const offerIcon = () => (
+    <svg
+      className="w-6 h-6 text-yellow-500"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
+      ></path>
+    </svg>
+  );
 
   return (
     <DashboardLayout>
@@ -230,162 +244,182 @@ const DashboardPage = () => {
         </div>
 
         {/* Stats cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat) => (
-            <div
-              key={stat.name}
-              className="bg-white rounded-lg shadow p-4 flex items-center"
-            >
-              <div className="p-3 rounded-full bg-gray-50 mr-4">
-                {stat.icon}
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                <p className="text-2xl font-semibold text-gray-800">
-                  {stat.value}
-                </p>
-              </div>
+        {isLoading ? (
+          <div className="flex justify-center my-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              {getAnalyticsStats().map((stat) => (
+                <div
+                  key={stat.name}
+                  className="bg-white rounded-lg shadow p-4 flex items-center"
+                >
+                  <div className="p-3 rounded-full bg-gray-50 mr-4">
+                    {stat.icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">
+                      {stat.name}
+                    </p>
+                    <p className="text-2xl font-semibold text-gray-800">
+                      {stat.value}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Main content area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent applications */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-800">
-                Recent Applications
-              </h2>
-            </div>
-            <div className="p-4">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Company
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Position
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Date
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {recentApplications.map((app) => (
-                      <tr key={app.id}>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {app.company}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {app.position}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">
-                            {app.date}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span
-                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${app.statusColor}`}
+            {/* Main content area */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Recent applications */}
+              <div className="lg:col-span-2 bg-white rounded-lg shadow">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h2 className="text-lg font-medium text-gray-800">
+                    Recent Applications
+                  </h2>
+                </div>
+                <div className="p-4">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                           >
-                            {app.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                            Company
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            Position
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            Date
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {recentApplications.length > 0 ? (
+                          recentApplications.map((app) => (
+                            <tr key={app.id}>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {app.company}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {app.position}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="text-sm text-gray-500">
+                                  {app.date}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span
+                                  className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${app.statusColor}`}
+                                >
+                                  {app.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td
+                              colSpan="4"
+                              className="px-4 py-4 text-center text-sm text-gray-500"
+                            >
+                              No applications found. Start tracking your job
+                              search!
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <Link
+                      to="/applications"
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      View all applications →
+                    </Link>
+                  </div>
+                </div>
               </div>
-              <div className="mt-4 text-center">
-                <button className="text-blue-600 hover:text-blue-800 text-sm">
-                  View all applications →
-                </button>
-              </div>
-            </div>
-          </div>
 
-          {/* Upcoming tasks */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-800">
-                Upcoming Tasks
-              </h2>
-            </div>
-            <div className="p-4">
-              <ul className="divide-y divide-gray-200">
-                {upcomingTasks.map((task) => (
-                  <li key={task.id} className="py-3">
-                    <div className="flex items-start">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {task.title}
-                        </p>
-                        <p className="text-sm text-gray-500">{task.date}</p>
-                      </div>
-                      <div>
-                        <span
-                          className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            task.type === "Interview"
-                              ? "bg-purple-100 text-purple-800"
-                              : task.type === "Follow-up"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {task.type}
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-4 text-center">
-                <button className="text-blue-600 hover:text-blue-800 text-sm">
-                  View all tasks →
-                </button>
+              {/* Upcoming tasks */}
+              <div className="bg-white rounded-lg shadow">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h2 className="text-lg font-medium text-gray-800">
+                    Upcoming Tasks
+                  </h2>
+                </div>
+                <div className="p-4">
+                  <ul className="divide-y divide-gray-200">
+                    {upcomingTasks.length > 0 ? (
+                      upcomingTasks.map((task) => (
+                        <li key={task.id} className="py-3">
+                          <div className="flex items-start">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {task.title}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {task.date}
+                              </p>
+                            </div>
+                            <div>
+                              <span
+                                className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  task.type === "Interview"
+                                    ? "bg-purple-100 text-purple-800"
+                                    : task.type === "Follow-up"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {task.type}
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="py-3 text-center text-sm text-gray-500">
+                        No upcoming tasks. Add some to stay organized!
+                      </li>
+                    )}
+                  </ul>
+                  <div className="mt-4 text-center">
+                    <Link
+                      to="/tasks"
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      View all tasks →
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Activity chart (placeholder) */}
-        <div className="mt-6 bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-800">
-              Activity Overview
-            </h2>
-          </div>
-          <div className="p-6">
-            <div className="h-64 bg-gray-50 rounded flex items-center justify-center">
-              <p className="text-gray-500">
-                Activity chart will be displayed here
-              </p>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

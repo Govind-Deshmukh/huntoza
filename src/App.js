@@ -8,6 +8,8 @@ import {
 import { AuthProvider } from "./context/AuthContext";
 import { DataProvider } from "./context/DataContext";
 import ProtectedRoute from "./components/protectedRoute";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 // Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
@@ -48,13 +50,25 @@ function App() {
       <DataProvider>
         <Router>
           <div className="min-h-screen bg-gray-50">
+            {/* Toast Container */}
+            <ToastContainer
+              position="top-right"
+              autoClose={5000}
+              hideProgressBar={false}
+              newestOnTop
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+            />
+
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<SignupPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-
               <Route
                 path="/reset-password/:token"
                 element={<ResetPasswordPage />}
@@ -105,17 +119,7 @@ function App() {
               </Route>
 
               {/* Redirect to dashboard if authenticated, otherwise to login */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-              {/* 404 Page */}
-              <Route
-                path="*"
-                element={
-                  <div className="flex items-center justify-center h-screen">
-                    Page not found
-                  </div>
-                }
-              />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>
         </Router>

@@ -1,6 +1,19 @@
-import React, { createContext, useState, useCallback, useContext } from "react";
+// src/context/EnhancedDataContext.js
+import React, {
+  createContext,
+  useState,
+  useCallback,
+  useContext,
+  useEffect,
+} from "react";
 import { useAuth } from "./AuthContext";
 import useCurrentPlan from "../hooks/useCurrentPlans";
+import AccessControl from "../utils/accessControl";
+import {
+  showSuccessToast,
+  showErrorToast,
+  handleApiError,
+} from "../utils/toastUtils";
 import {
   jobService,
   taskService,
@@ -61,8 +74,21 @@ export const DataProvider = ({ children }) => {
 
   // Plans state
   const [plans, setPlans] = useState([]);
+
   // Use the safe current plan hook instead of state + useEffect
   const currentPlan = useCurrentPlan(isAuthenticated);
+
+  // Initialize access control with current plan
+  const [accessControl, setAccessControl] = useState(
+    new AccessControl(currentPlan)
+  );
+
+  // Update access control when current plan changes
+  useEffect(() => {
+    if (currentPlan) {
+      setAccessControl(new AccessControl(currentPlan));
+    }
+  }, [currentPlan]);
 
   // Analytics state
   const [dashboardAnalytics, setDashboardAnalytics] = useState(null);
@@ -86,7 +112,9 @@ export const DataProvider = ({ children }) => {
 
       return data;
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load dashboard data");
+      const errorMessage = "Failed to load dashboard data";
+      setError(errorMessage);
+      handleApiError(err);
       console.error("Dashboard data error:", err);
       return null;
     } finally {
@@ -104,7 +132,9 @@ export const DataProvider = ({ children }) => {
       setPlans(plansData);
       return plansData;
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load plans");
+      const errorMessage = "Failed to load plans";
+      setError(errorMessage);
+      handleApiError(err);
       console.error("Load plans error:", err);
       return [];
     } finally {
@@ -115,8 +145,13 @@ export const DataProvider = ({ children }) => {
   // Use the refreshPlan method from our hook
   const loadCurrentPlan = useCallback(async () => {
     if (!isAuthenticated) return null;
-    await currentPlan.refreshPlan();
-    return currentPlan;
+    try {
+      await currentPlan.refreshPlan();
+      return currentPlan;
+    } catch (err) {
+      handleApiError(err);
+      return null;
+    }
   }, [isAuthenticated, currentPlan]);
 
   // === JOBS OPERATIONS ===
@@ -139,7 +174,9 @@ export const DataProvider = ({ children }) => {
 
         return data;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load jobs");
+        const errorMessage = "Failed to load jobs";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Load jobs error:", err);
         return null;
       } finally {
@@ -160,7 +197,9 @@ export const DataProvider = ({ children }) => {
         const jobData = await jobService.getJobById(jobId);
         return jobData;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load job details");
+        const errorMessage = "Failed to load job details";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Get job error:", err);
         return null;
       } finally {
@@ -175,6 +214,16 @@ export const DataProvider = ({ children }) => {
       if (!isAuthenticated) return null;
 
       try {
+        // Check if we can create a new job based on current plan
+        const canCreate = accessControl.canCreateJobApplication(
+          jobsPagination.totalItems
+        );
+        if (!canCreate) {
+          throw new Error(
+            `You've reached the job applications limit for your ${currentPlan.plan.name} plan`
+          );
+        }
+
         setIsLoading(true);
         clearError();
 
@@ -185,16 +234,32 @@ export const DataProvider = ({ children }) => {
           setJobs((prevJobs) => [createdJob, ...prevJobs]);
         }
 
+        // Update total count
+        setJobsPagination((prev) => ({
+          ...prev,
+          totalItems: prev.totalItems + 1,
+        }));
+
+        showSuccessToast("Job application created successfully!");
         return createdJob;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to create job");
+        const errorMessage = err.message || "Failed to create job";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Create job error:", err);
         throw err;
       } finally {
         setIsLoading(false);
       }
     },
-    [isAuthenticated, clearError, jobs.length]
+    [
+      isAuthenticated,
+      clearError,
+      jobs.length,
+      jobsPagination.totalItems,
+      accessControl,
+      currentPlan.plan.name,
+    ]
   );
 
   const updateJob = useCallback(
@@ -214,9 +279,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Job application updated successfully!");
         return updatedJob;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to update job");
+        const errorMessage = "Failed to update job";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Update job error:", err);
         throw err;
       } finally {
@@ -241,9 +309,18 @@ export const DataProvider = ({ children }) => {
           setJobs((prevJobs) => prevJobs.filter((job) => job._id !== jobId));
         }
 
+        // Update total count
+        setJobsPagination((prev) => ({
+          ...prev,
+          totalItems: Math.max(0, prev.totalItems - 1),
+        }));
+
+        showSuccessToast("Job application deleted successfully!");
         return true;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to delete job");
+        const errorMessage = "Failed to delete job";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Delete job error:", err);
         return false;
       } finally {
@@ -270,9 +347,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Interview added successfully!");
         return updatedJob;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to add interview");
+        const errorMessage = "Failed to add interview";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Add interview error:", err);
         throw err;
       } finally {
@@ -303,9 +383,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Interview updated successfully!");
         return updatedJob;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to update interview");
+        const errorMessage = "Failed to update interview";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Update interview error:", err);
         throw err;
       } finally {
@@ -332,9 +415,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Interview deleted successfully!");
         return updatedJob;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to delete interview");
+        const errorMessage = "Failed to delete interview";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Delete interview error:", err);
         throw err;
       } finally {
@@ -364,7 +450,9 @@ export const DataProvider = ({ children }) => {
 
         return data;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load tasks");
+        const errorMessage = "Failed to load tasks";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Load tasks error:", err);
         return null;
       } finally {
@@ -385,7 +473,9 @@ export const DataProvider = ({ children }) => {
         const taskData = await taskService.getTaskById(taskId);
         return taskData;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load task details");
+        const errorMessage = "Failed to load task details";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Get task error:", err);
         return null;
       } finally {
@@ -410,9 +500,12 @@ export const DataProvider = ({ children }) => {
           setTasks((prevTasks) => [createdTask, ...prevTasks]);
         }
 
+        showSuccessToast("Task created successfully!");
         return createdTask;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to create task");
+        const errorMessage = "Failed to create task";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Create task error:", err);
         throw err;
       } finally {
@@ -439,9 +532,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Task updated successfully!");
         return updatedTask;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to update task");
+        const errorMessage = "Failed to update task";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Update task error:", err);
         throw err;
       } finally {
@@ -468,9 +564,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Task marked as completed!");
         return updatedTask;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to complete task");
+        const errorMessage = "Failed to complete task";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Complete task error:", err);
         throw err;
       } finally {
@@ -497,9 +596,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Task deleted successfully!");
         return true;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to delete task");
+        const errorMessage = "Failed to delete task";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Delete task error:", err);
         return false;
       } finally {
@@ -529,7 +631,9 @@ export const DataProvider = ({ children }) => {
 
         return data;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load contacts");
+        const errorMessage = "Failed to load contacts";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Load contacts error:", err);
         return null;
       } finally {
@@ -550,9 +654,9 @@ export const DataProvider = ({ children }) => {
         const contactData = await contactService.getContactById(contactId);
         return contactData;
       } catch (err) {
-        setError(
-          err.response?.data?.message || "Failed to load contact details"
-        );
+        const errorMessage = "Failed to load contact details";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Get contact error:", err);
         return null;
       } finally {
@@ -567,6 +671,16 @@ export const DataProvider = ({ children }) => {
       if (!isAuthenticated) return null;
 
       try {
+        // Check if we can create a new contact based on current plan
+        const canCreate = accessControl.canCreateContact(
+          contactsPagination.totalItems
+        );
+        if (!canCreate) {
+          throw new Error(
+            `You've reached the contacts limit for your ${currentPlan.plan.name} plan`
+          );
+        }
+
         setIsLoading(true);
         clearError();
 
@@ -577,16 +691,32 @@ export const DataProvider = ({ children }) => {
           setContacts((prevContacts) => [createdContact, ...prevContacts]);
         }
 
+        // Update total count
+        setContactsPagination((prev) => ({
+          ...prev,
+          totalItems: prev.totalItems + 1,
+        }));
+
+        showSuccessToast("Contact created successfully!");
         return createdContact;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to create contact");
+        const errorMessage = err.message || "Failed to create contact";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Create contact error:", err);
         throw err;
       } finally {
         setIsLoading(false);
       }
     },
-    [isAuthenticated, clearError, contacts.length]
+    [
+      isAuthenticated,
+      clearError,
+      contacts.length,
+      contactsPagination.totalItems,
+      accessControl,
+      currentPlan.plan.name,
+    ]
   );
 
   const updateContact = useCallback(
@@ -611,9 +741,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Contact updated successfully!");
         return updatedContact;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to update contact");
+        const errorMessage = "Failed to update contact";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Update contact error:", err);
         throw err;
       } finally {
@@ -640,9 +773,18 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        // Update total count
+        setContactsPagination((prev) => ({
+          ...prev,
+          totalItems: Math.max(0, prev.totalItems - 1),
+        }));
+
+        showSuccessToast("Contact deleted successfully!");
         return true;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to delete contact");
+        const errorMessage = "Failed to delete contact";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Delete contact error:", err);
         return false;
       } finally {
@@ -673,11 +815,17 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast(
+          updatedContact.favorite
+            ? "Contact added to favorites"
+            : "Contact removed from favorites"
+        );
+
         return updatedContact;
       } catch (err) {
-        setError(
-          err.response?.data?.message || "Failed to update favorite status"
-        );
+        const errorMessage = "Failed to update favorite status";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Toggle favorite error:", err);
         throw err;
       } finally {
@@ -709,9 +857,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Interaction added successfully!");
         return updatedContact;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to add interaction");
+        const errorMessage = "Failed to add interaction";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Add interaction error:", err);
         throw err;
       } finally {
@@ -744,9 +895,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Interaction updated successfully!");
         return updatedContact;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to update interaction");
+        const errorMessage = "Failed to update interaction";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Update interaction error:", err);
         throw err;
       } finally {
@@ -778,9 +932,12 @@ export const DataProvider = ({ children }) => {
           );
         }
 
+        showSuccessToast("Interaction deleted successfully!");
         return updatedContact;
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to delete interaction");
+        const errorMessage = "Failed to delete interaction";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Delete interaction error:", err);
         throw err;
       } finally {
@@ -807,13 +964,14 @@ export const DataProvider = ({ children }) => {
         // If the plan is free, update current plan immediately
         if (result.nextStep !== "payment") {
           await currentPlan.refreshPlan();
+          showSuccessToast("Plan upgraded successfully!");
         }
 
         return result;
       } catch (err) {
-        setError(
-          err.response?.data?.message || "Failed to initiate plan upgrade"
-        );
+        const errorMessage = "Failed to initiate plan upgrade";
+        setError(errorMessage);
+        handleApiError(err);
         console.error("Plan upgrade error:", err);
         throw err;
       } finally {
@@ -850,12 +1008,13 @@ export const DataProvider = ({ children }) => {
             return orderData;
           } catch (refreshErr) {
             setError("Your session has expired. Please log in again.");
+            handleApiError(refreshErr);
             throw refreshErr;
           }
         } else {
-          setError(
-            err.response?.data?.message || "Failed to create payment order"
-          );
+          const errorMessage = "Failed to create payment order";
+          setError(errorMessage);
+          handleApiError(err);
           throw err;
         }
       } finally {
@@ -878,6 +1037,7 @@ export const DataProvider = ({ children }) => {
 
         // Refresh current plan after successful payment
         await currentPlan.refreshPlan();
+        showSuccessToast("Payment verified successfully!");
 
         return response;
       } catch (err) {
@@ -888,13 +1048,17 @@ export const DataProvider = ({ children }) => {
             // Retry the request after refresh
             const response = await paymentService.verifyPayment(paymentData);
             await currentPlan.refreshPlan();
+            showSuccessToast("Payment verified successfully!");
             return response;
           } catch (refreshErr) {
             setError("Your session has expired. Please log in again.");
+            handleApiError(refreshErr);
             throw refreshErr;
           }
         } else {
-          setError(err.response?.data?.message || "Failed to verify payment");
+          const errorMessage = "Failed to verify payment";
+          setError(errorMessage);
+          handleApiError(err);
           throw err;
         }
       } finally {
@@ -924,12 +1088,13 @@ export const DataProvider = ({ children }) => {
           return transactions;
         } catch (refreshErr) {
           setError("Your session has expired. Please log in again.");
+          handleApiError(refreshErr);
           return [];
         }
       } else {
-        setError(
-          err.response?.data?.message || "Failed to load payment history"
-        );
+        const errorMessage = "Failed to load payment history";
+        setError(errorMessage);
+        handleApiError(err);
         return [];
       }
     } finally {
@@ -949,6 +1114,7 @@ export const DataProvider = ({ children }) => {
 
       // Refresh current plan
       await currentPlan.refreshPlan();
+      showSuccessToast("Subscription cancelled successfully!");
 
       return true;
     } catch (err) {
@@ -959,15 +1125,17 @@ export const DataProvider = ({ children }) => {
           // Retry the request after refresh
           await planService.cancelSubscription();
           await currentPlan.refreshPlan();
+          showSuccessToast("Subscription cancelled successfully!");
           return true;
         } catch (refreshErr) {
           setError("Your session has expired. Please log in again.");
+          handleApiError(refreshErr);
           throw refreshErr;
         }
       } else {
-        setError(
-          err.response?.data?.message || "Failed to cancel subscription"
-        );
+        const errorMessage = "Failed to cancel subscription";
+        setError(errorMessage);
+        handleApiError(err);
         throw err;
       }
     } finally {
@@ -991,6 +1159,7 @@ export const DataProvider = ({ children }) => {
     plans,
     currentPlan,
     dashboardAnalytics,
+    accessControl,
 
     // Methods
     clearError,
