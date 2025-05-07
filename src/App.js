@@ -22,24 +22,24 @@ import DashboardPage from "./pages/dashboard/DashboardPage";
 import ProfilePage from "./pages/dashboard/ProfilePage";
 
 // Job Related Pages
-import JobDetailsPage from "./pages/dashboard/JobDetailsPage";
-import InterviewFormPage from "./pages/dashboard/InterviewFormPage";
+import JobDetailsPage from "./pages/dashboard/applications/JobDetailsPage";
+import InterviewFormPage from "./pages/dashboard/applications/InterviewFormPage";
 
 // Task Related Pages
-import TasksPage from "./pages/dashboard/TasksPage";
-import TaskDetailsPage from "./pages/dashboard/TaskDetailsPage";
-import TaskFormPage from "./pages/dashboard/TaskFormPage";
+import TasksPage from "./pages/dashboard/tasks/TasksPage";
+import TaskDetailsPage from "./pages/dashboard/tasks/TaskDetailsPage";
+import TaskFormPage from "./pages/dashboard/tasks/TaskFormPage";
 
 // Contact Related Pages
-import ContactPage from "./pages/dashboard/ContactPage";
-import ContactDetailsPage from "./pages/dashboard/ContactDetailsPage";
-import ContactFormPage from "./pages/dashboard/ContactFormPage";
+import ContactPage from "./pages/dashboard/contacts/ContactPage";
+import ContactDetailsPage from "./pages/dashboard/contacts/ContactDetailsPage";
+import ContactFormPage from "./pages/dashboard/contacts/ContactFormPage";
 
 // Plan and Payment Pages
 import PaymentHistoryPage from "./pages/dashboard/PaymentHistoryPage";
 import SubscriptionPage from "./pages/dashboard/SubscriptionPage";
-import ApplicationsPage from "./pages/dashboard/ApplicationsPage";
-import JobFormPage from "./pages/dashboard/JobFormPage";
+import ApplicationsPage from "./pages/dashboard/applications/ApplicationsPage";
+import JobFormPage from "./pages/dashboard/applications/JobFormPage";
 import HomePage from "./pages/home/HomePage";
 import PaymentPage from "./pages/payment/PaymentPage";
 import PlansPage from "./pages/dashboard/PlansPage";

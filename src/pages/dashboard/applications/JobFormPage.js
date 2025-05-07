@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import DashboardLayout from "../../components/dashboard/DashboardLayout";
-import { useData } from "../../context/DataContext";
-import ExtensionIntegration from "../../components/dashboard/ExtensionIntegration";
+import DashboardLayout from "../../../components/dashboard/DashboardLayout";
+import { useData } from "../../../context/DataContext";
+import ExtensionIntegration from "../../../components/dashboard/ExtensionIntegration";
 
 const JobFormPage = () => {
   const navigate = useNavigate();

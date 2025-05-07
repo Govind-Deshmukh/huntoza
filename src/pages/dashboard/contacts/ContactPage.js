@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import DashboardLayout from "../../components/dashboard/DashboardLayout";
-import { useData } from "../../context/DataContext";
+import DashboardLayout from "../../../components/dashboard/DashboardLayout";
+import { useData } from "../../../context/DataContext";
 
 const ContactPage = () => {
   const {
