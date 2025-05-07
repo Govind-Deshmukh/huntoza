@@ -48,6 +48,7 @@ import PlansPage from "./pages/dashboard/PlansPage";
 import TermsPage from "./pages/terms/TermsOfUse";
 import PrivacyPage from "./pages/privacy/PrivacyPolicy";
 import RefundPage from "./pages/terms/RefundPage";
+import ContactUsPage from "./pages/contact/ContactUsPage";
 
 function App() {
   return (
@@ -78,6 +79,7 @@ function App() {
                 path="/reset-password/:token"
                 element={<ResetPasswordPage />}
               />
+              <Route path="/contact" element={<ContactUsPage />} />
               <Route path="/terms-of-use" element={<TermsPage />} />
               <Route path="/privacy-policy" element={<PrivacyPage />} />
               <Route path="/refund-policy" element={<RefundPage />} />
