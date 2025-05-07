@@ -1,8 +1,12 @@
+// src/pages/dashboard/applications/JobFormPage.js
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import DashboardLayout from "../../../components/dashboard/DashboardLayout";
 import { useData } from "../../../context/DataContext";
 import ExtensionIntegration from "../../../components/dashboard/ExtensionIntegration";
+import FormPage from "../../../components/common/FormPage";
+import FormSection from "../../../components/common/form/FormSection";
+import FormField from "../../../components/common/FormField";
+import SelectField from "../../../components/common/form/SelectField";
 
 const JobFormPage = () => {
   const navigate = useNavigate();
@@ -45,55 +49,17 @@ const JobFormPage = () => {
 
   // Form state
   const [formData, setFormData] = useState(initialFormState);
-
-  // Validation state
   const [validationErrors, setValidationErrors] = useState({});
-
-  // Success message state
   const [successMessage, setSuccessMessage] = useState("");
-
-  // Extension data received flag
   const [extensionDataReceived, setExtensionDataReceived] = useState(false);
 
-  // Function to check for job data from the Chrome extension
-  const checkForExtensionJobData = () => {
-    try {
-      const storedJobData = localStorage.getItem("pendingJobData");
-      if (storedJobData) {
-        const jobData = JSON.parse(storedJobData);
-        console.log("Received job data from extension:", jobData);
+  // Load contacts for contact person dropdown
+  useEffect(() => {
+    loadContacts();
+  }, [loadContacts]);
 
-        // Update form with job data from extension
-        const updatedData = {
-          ...initialFormState,
-          company: jobData.company || "",
-          position: jobData.position || "",
-          jobLocation: jobData.jobLocation || "remote",
-          jobType: jobData.jobType || "full-time",
-          jobDescription: jobData.jobDescription || "",
-          jobUrl: jobData.jobUrl || "",
-          priority: jobData.priority || "medium",
-          favorite: jobData.favorite || false,
-          salary: {
-            min: jobData.salary?.min || 0,
-            max: jobData.salary?.max || 0,
-            currency: jobData.salary?.currency || "INR",
-          },
-        };
-
-        setFormData(updatedData);
-        setExtensionDataReceived(true);
-
-        // Clear the stored data after using it
-        localStorage.removeItem("pendingJobData");
-      }
-    } catch (error) {
-      console.error("Error processing extension job data:", error);
-    }
-  };
-
+  // Extension data handler
   const handleExtensionData = (jobData) => {
-    // Update form with job data from extension
     const updatedData = {
       ...initialFormState,
       company: jobData.company || "",
@@ -115,76 +81,41 @@ const JobFormPage = () => {
     setExtensionDataReceived(true);
   };
 
-  // Load contacts for contact person dropdown
+  // Load job data if in edit mode
   useEffect(() => {
-    loadContacts();
-  }, [loadContacts]);
-
-  // Listen for custom event from the Chrome extension
-  useEffect(() => {
-    // Define the event handler
-    const handleJobDataAvailable = (event) => {
-      if (event.detail?.source === "chromeExtension") {
-        checkForExtensionJobData();
-      }
-    };
-
-    // Register the event listener
-    window.addEventListener("jobDataAvailable", handleJobDataAvailable);
-
-    // Check on initial load too
-    checkForExtensionJobData();
-
-    // Cleanup the event listener on unmount
-    return () => {
-      window.removeEventListener("jobDataAvailable", handleJobDataAvailable);
-    };
-  }, []);
-
-  // Load job data if in edit mode or check for state data
-  useEffect(() => {
-    const fetchJob = async () => {
-      try {
-        const jobData = await getJobById(id);
-
-        if (jobData) {
-          // Format dates for the form inputs
-          const formattedData = { ...jobData };
-
-          if (jobData.applicationDate) {
-            formattedData.applicationDate = new Date(jobData.applicationDate)
-              .toISOString()
-              .slice(0, 10);
-          }
-
-          // Handle contact person if it's an object
-          if (
-            jobData.contactPerson &&
-            typeof jobData.contactPerson === "object"
-          ) {
-            formattedData.contactPerson = jobData.contactPerson._id;
-          }
-
-          // Ensure salary is properly structured
-          if (!formattedData.salary) {
-            formattedData.salary = {
-              min: 0,
-              max: 0,
-              currency: "INR",
-            };
-          }
-
-          setFormData(formattedData);
-        }
-      } catch (err) {
-        console.error("Error fetching job data:", err);
-      }
-    };
-
     if (isEditMode) {
+      const fetchJob = async () => {
+        try {
+          const jobData = await getJobById(id);
+          if (jobData) {
+            const formattedData = { ...jobData };
+
+            if (jobData.applicationDate) {
+              formattedData.applicationDate = new Date(jobData.applicationDate)
+                .toISOString()
+                .slice(0, 10);
+            }
+
+            if (
+              jobData.contactPerson &&
+              typeof jobData.contactPerson === "object"
+            ) {
+              formattedData.contactPerson = jobData.contactPerson._id;
+            }
+
+            if (!formattedData.salary) {
+              formattedData.salary = { min: 0, max: 0, currency: "INR" };
+            }
+
+            setFormData(formattedData);
+          }
+        } catch (err) {
+          console.error("Error fetching job data:", err);
+        }
+      };
+
       fetchJob();
     } else if (location.state?.jobData && !extensionDataReceived) {
-      // If there's state data from navigation and we haven't already processed extension data
       setFormData({
         ...initialFormState,
         ...location.state.jobData,
@@ -195,11 +126,8 @@ const JobFormPage = () => {
   // Handle input changes
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-
-    // Handle checkbox inputs
     const inputValue = type === "checkbox" ? checked : value;
 
-    // Clear validation error for this field
     if (validationErrors[name]) {
       setValidationErrors((prev) => {
         const newErrors = { ...prev };
@@ -208,12 +136,10 @@ const JobFormPage = () => {
       });
     }
 
-    // Clear success message
     if (successMessage) {
       setSuccessMessage("");
     }
 
-    // Handle nested salary object properties
     if (name.startsWith("salary.")) {
       const salaryProp = name.split(".")[1];
       setFormData((prev) => ({
@@ -252,7 +178,6 @@ const JobFormPage = () => {
     e.preventDefault();
     clearError();
 
-    // Validate form
     if (!validateForm()) {
       return;
     }
@@ -267,7 +192,6 @@ const JobFormPage = () => {
         setFormData(initialFormState);
       }
 
-      // Navigate back to applications list after a short delay
       setTimeout(() => {
         navigate("/applications");
       }, 1500);
@@ -276,387 +200,186 @@ const JobFormPage = () => {
     }
   };
 
+  // Job type options
+  const jobTypeOptions = [
+    { value: "full-time", label: "Full Time" },
+    { value: "part-time", label: "Part Time" },
+    { value: "contract", label: "Contract" },
+    { value: "internship", label: "Internship" },
+    { value: "remote", label: "Remote" },
+    { value: "other", label: "Other" },
+  ];
+
+  // Priority options
+  const priorityOptions = [
+    { value: "high", label: "High" },
+    { value: "medium", label: "Medium" },
+    { value: "low", label: "Low" },
+  ];
+
+  // Currency options
+  const currencyOptions = [
+    { value: "INR", label: "INR (₹)" },
+    { value: "USD", label: "USD ($)" },
+    { value: "EUR", label: "EUR (€)" },
+    { value: "GBP", label: "GBP (£)" },
+    { value: "CAD", label: "CAD (C$)" },
+    { value: "AUD", label: "AUD (A$)" },
+    { value: "JPY", label: "JPY (¥)" },
+  ];
+
   return (
-    <DashboardLayout>
-      <div className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              {isEditMode ? "Edit Job Application" : "Add New Job Application"}
-            </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              {isEditMode
-                ? "Update your job application details"
-                : "Create a new job application to track in your job hunt"}
-            </p>
+    <FormPage
+      title={isEditMode ? "Edit Job Application" : "Add New Job Application"}
+      subtitle={
+        isEditMode
+          ? "Update your job application details"
+          : "Create a new job application to track in your job hunt"
+      }
+      isEditMode={isEditMode}
+      isLoading={isLoading}
+      error={error}
+      successMessage={successMessage}
+      onSubmit={handleSubmit}
+      onCancel={() => navigate("/applications")}
+      submitText={isEditMode ? "Update Application" : "Add Application"}
+    >
+      {/* Extension integration */}
+      <ExtensionIntegration onDataReceived={handleExtensionData} />
 
-            {/* Add the ExtensionIntegration component here */}
-            <ExtensionIntegration onDataReceived={handleExtensionData} />
-          </div>
+      {/* Basic information */}
+      <FormSection>
+        <FormField
+          id="company"
+          name="company"
+          label="Company"
+          value={formData.company}
+          onChange={handleChange}
+          error={validationErrors.company}
+          required={true}
+          placeholder="Company name"
+        />
 
-          {/* Error message */}
-          {error && (
-            <div className="rounded-md bg-red-50 p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-5 w-5 text-red-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-red-800">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
+        <FormField
+          id="position"
+          name="position"
+          label="Position"
+          value={formData.position}
+          onChange={handleChange}
+          error={validationErrors.position}
+          required={true}
+          placeholder="Job title/position"
+        />
 
-          {/* Success message */}
-          {successMessage && (
-            <div className="rounded-md bg-green-50 p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-5 w-5 text-green-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-green-800">
-                    {successMessage}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+        <FormField
+          id="jobLocation"
+          name="jobLocation"
+          label="Location"
+          value={formData.jobLocation}
+          onChange={handleChange}
+          placeholder="Remote, Hybrid, or Office location"
+        />
 
-          {/* Form */}
-          {isLoading ? (
-            <div className="flex justify-center my-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-          ) : (
-            <form
-              onSubmit={handleSubmit}
-              className="bg-white shadow rounded-lg p-6"
-            >
-              <div className="grid grid-cols-1 gap-6">
-                {/* Basic information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Company */}
-                  <div>
-                    <label
-                      htmlFor="company"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Company <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="company"
-                      id="company"
-                      value={formData.company}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${
-                        validationErrors.company
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                      }`}
-                      placeholder="Company name"
-                    />
-                    {validationErrors.company && (
-                      <p className="mt-1 text-sm text-red-600">
-                        {validationErrors.company}
-                      </p>
-                    )}
-                  </div>
+        <SelectField
+          id="jobType"
+          name="jobType"
+          label="Job Type"
+          value={formData.jobType}
+          onChange={handleChange}
+          options={jobTypeOptions}
+          showEmptyOption={false}
+        />
+      </FormSection>
 
-                  {/* Position */}
-                  <div>
-                    <label
-                      htmlFor="position"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Position <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="position"
-                      id="position"
-                      value={formData.position}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${
-                        validationErrors.position
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                      }`}
-                      placeholder="Job title/position"
-                    />
-                    {validationErrors.position && (
-                      <p className="mt-1 text-sm text-red-600">
-                        {validationErrors.position}
-                      </p>
-                    )}
-                  </div>
-                </div>
+      {/* Salary information */}
+      <FormSection title="Salary Information">
+        <FormField
+          id="salary.min"
+          name="salary.min"
+          label="Minimum Salary"
+          type="number"
+          value={formData.salary.min}
+          onChange={handleChange}
+          min="0"
+          step="1000"
+        />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Job Location */}
-                  <div>
-                    <label
-                      htmlFor="jobLocation"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Location
-                    </label>
-                    <input
-                      type="text"
-                      name="jobLocation"
-                      id="jobLocation"
-                      value={formData.jobLocation}
-                      onChange={handleChange}
-                      className="mt-1 block w-full rounded-md shadow-sm sm:text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="Remote, Hybrid, or Office location"
-                    />
-                  </div>
+        <FormField
+          id="salary.max"
+          name="salary.max"
+          label="Maximum Salary"
+          type="number"
+          value={formData.salary.max}
+          onChange={handleChange}
+          min="0"
+          step="1000"
+        />
 
-                  {/* Job Type */}
-                  <div>
-                    <label
-                      htmlFor="jobType"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Job Type
-                    </label>
-                    <select
-                      id="jobType"
-                      name="jobType"
-                      value={formData.jobType}
-                      onChange={handleChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 sm:text-sm"
-                    >
-                      <option value="full-time">Full Time</option>
-                      <option value="part-time">Part Time</option>
-                      <option value="contract">Contract</option>
-                      <option value="internship">Internship</option>
-                      <option value="remote">Remote</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                </div>
+        <SelectField
+          id="salary.currency"
+          name="salary.currency"
+          label="Currency"
+          value={formData.salary.currency}
+          onChange={handleChange}
+          options={currencyOptions}
+          showEmptyOption={false}
+        />
+      </FormSection>
 
-                {/* Salary Range */}
-                <div className="border-t border-gray-200 pt-4">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Salary Information
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Minimum Salary */}
-                    <div>
-                      <label
-                        htmlFor="salary.min"
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Minimum Salary
-                      </label>
-                      <input
-                        type="number"
-                        name="salary.min"
-                        id="salary.min"
-                        value={formData.salary.min}
-                        onChange={handleChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 sm:text-sm"
-                        min="0"
-                        step="1000"
-                      />
-                    </div>
+      {/* Job URL */}
+      <FormField
+        id="jobUrl"
+        name="jobUrl"
+        label="Job URL"
+        value={formData.jobUrl}
+        onChange={handleChange}
+        placeholder="https://example.com/job-posting"
+      />
 
-                    {/* Maximum Salary */}
-                    <div>
-                      <label
-                        htmlFor="salary.max"
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Maximum Salary
-                      </label>
-                      <input
-                        type="number"
-                        name="salary.max"
-                        id="salary.max"
-                        value={formData.salary.max}
-                        onChange={handleChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 sm:text-sm"
-                        min="0"
-                        step="1000"
-                      />
-                    </div>
+      {/* Job description */}
+      <FormField
+        id="jobDescription"
+        name="jobDescription"
+        label="Job Description"
+        type="textarea"
+        value={formData.jobDescription}
+        onChange={handleChange}
+        placeholder="Copy and paste the job description here"
+      />
 
-                    {/* Salary Currency */}
-                    <div>
-                      <label
-                        htmlFor="salary.currency"
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Currency
-                      </label>
-                      <select
-                        id="salary.currency"
-                        name="salary.currency"
-                        value={formData.salary.currency}
-                        onChange={handleChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 sm:text-sm"
-                      >
-                        <option value="INR">INR (₹)</option>
-                        <option value="USD">USD ($)</option>
-                        <option value="EUR">EUR (€)</option>
-                        <option value="GBP">GBP (£)</option>
-                        <option value="CAD">CAD (C$)</option>
-                        <option value="AUD">AUD (A$)</option>
-                        <option value="JPY">JPY (¥)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
+      {/* Notes */}
+      <FormField
+        id="notes"
+        name="notes"
+        label="Notes"
+        type="textarea"
+        value={formData.notes}
+        onChange={handleChange}
+        placeholder="Add any notes or thoughts about this application"
+      />
 
-                {/* Job URL */}
-                <div>
-                  <label
-                    htmlFor="jobUrl"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Job URL
-                  </label>
-                  <input
-                    type="text"
-                    name="jobUrl"
-                    id="jobUrl"
-                    value={formData.jobUrl}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 sm:text-sm"
-                    placeholder="https://example.com/job-posting"
-                  />
-                </div>
+      {/* Priority and favorites */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+        <SelectField
+          id="priority"
+          name="priority"
+          label="Priority"
+          value={formData.priority}
+          onChange={handleChange}
+          options={priorityOptions}
+          showEmptyOption={false}
+        />
 
-                {/* Job Description */}
-                <div className="border-t border-gray-200 pt-4">
-                  <label
-                    htmlFor="jobDescription"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Job Description
-                  </label>
-                  <textarea
-                    id="jobDescription"
-                    name="jobDescription"
-                    rows="5"
-                    value={formData.jobDescription}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 sm:text-sm"
-                    placeholder="Copy and paste the job description here"
-                  ></textarea>
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label
-                    htmlFor="notes"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Notes
-                  </label>
-                  <textarea
-                    id="notes"
-                    name="notes"
-                    rows="3"
-                    value={formData.notes}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 sm:text-sm"
-                    placeholder="Add any notes or thoughts about this application"
-                  ></textarea>
-                </div>
-
-                {/* Priority */}
-                <div>
-                  <label
-                    htmlFor="priority"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Priority
-                  </label>
-                  <select
-                    id="priority"
-                    name="priority"
-                    value={formData.priority}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 sm:text-sm"
-                  >
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </select>
-                </div>
-
-                {/* Favorite */}
-                <div className="flex items-center">
-                  <input
-                    id="favorite"
-                    name="favorite"
-                    type="checkbox"
-                    checked={formData.favorite}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <label
-                    htmlFor="favorite"
-                    className="ml-2 block text-sm text-gray-700"
-                  >
-                    Mark as favorite
-                  </label>
-                </div>
-
-                {/* Form buttons */}
-                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/applications")}
-                    className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
-                  >
-                    {isLoading
-                      ? "Saving..."
-                      : isEditMode
-                      ? "Update Application"
-                      : "Add Application"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
-        </div>
+        <FormField
+          id="favorite"
+          name="favorite"
+          label="Mark as favorite"
+          type="checkbox"
+          checked={formData.favorite}
+          onChange={handleChange}
+        />
       </div>
-    </DashboardLayout>
+    </FormPage>
   );
 };
 

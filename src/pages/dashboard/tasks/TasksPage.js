@@ -6,7 +6,9 @@ import TasksHeader from "../../../components/dashboard/tasks/TasksHeader";
 import TasksFilters from "../../../components/dashboard/tasks/TasksFilters";
 import TasksList from "../../../components/dashboard/tasks/TasksList";
 import EmptyTasksState from "../../../components/dashboard/tasks/EmptyTasksState";
-import TasksPagination from "../../../components/dashboard/tasks/TasksPagination";
+import Pagination from "../../../components/common/Pagination";
+import LoadingSpinner from "../../../components/common/LoadingSpinner";
+import ErrorAlert from "../../../components/common/ErrorAlert";
 
 const TasksPage = () => {
   const {
@@ -53,7 +55,6 @@ const TasksPage = () => {
   const handleCompleteTask = async (taskId) => {
     try {
       await completeTask(taskId);
-      // The tasks list will be updated through the context
     } catch (err) {
       console.error("Error completing task:", err);
     }
@@ -64,7 +65,6 @@ const TasksPage = () => {
     if (window.confirm("Are you sure you want to delete this task?")) {
       try {
         await deleteTask(taskId);
-        // The tasks list will be updated through the context
       } catch (err) {
         console.error("Error deleting task:", err);
       }
@@ -109,8 +109,6 @@ const TasksPage = () => {
     return new Date(dueDate) < today;
   };
 
-  // Continuing the TasksPage component:
-
   // Get priority badge
   const getPriorityBadge = (priority) => {
     let bgColor;
@@ -141,44 +139,15 @@ const TasksPage = () => {
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <TasksHeader />
-
           <TasksFilters filters={filters} onFilterChange={handleFilterChange} />
+          <ErrorAlert message={error} />
 
-          {/* Error display */}
-          {error && (
-            <div className="rounded-md bg-red-50 p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-5 w-5 text-red-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-red-800">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Loading state */}
           {isLoading ? (
-            <div className="bg-white shadow rounded-lg p-6 flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
+            <LoadingSpinner />
           ) : tasks.length === 0 ? (
             <EmptyTasksState />
           ) : (
             <div>
-              {/* Tasks list */}
               <TasksList
                 tasks={tasks}
                 onCompleteTask={handleCompleteTask}
@@ -188,9 +157,8 @@ const TasksPage = () => {
                 getPriorityBadge={getPriorityBadge}
               />
 
-              {/* Pagination */}
               {tasksPagination.numOfPages > 1 && (
-                <TasksPagination
+                <Pagination
                   currentPage={currentPage}
                   totalPages={tasksPagination.numOfPages}
                   totalItems={tasksPagination.totalItems}
