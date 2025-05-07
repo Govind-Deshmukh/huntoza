@@ -44,6 +44,11 @@ import HomePage from "./pages/home/HomePage";
 import PaymentPage from "./pages/payment/PaymentPage";
 import PlansPage from "./pages/dashboard/PlansPage";
 
+// legal pages
+import TermsPage from "./pages/terms/TermsOfUse";
+import PrivacyPage from "./pages/privacy/PrivacyPolicy";
+import RefundPage from "./pages/terms/RefundPage";
+
 function App() {
   return (
     <AuthProvider>
@@ -73,6 +78,9 @@ function App() {
                 path="/reset-password/:token"
                 element={<ResetPasswordPage />}
               />
+              <Route path="/terms-of-use" element={<TermsPage />} />
+              <Route path="/privacy-policy" element={<PrivacyPage />} />
+              <Route path="/refund-policy" element={<RefundPage />} />
 
               {/* Protected Routes */}
               <Route element={<ProtectedRoute />}>

@@ -15,22 +15,16 @@ const Footer = () => {
           </div>
           <div className="flex space-x-4">
             <Link
-              to="/terms"
+              to="/terms-of-use"
               className="text-sm text-gray-500 hover:text-gray-700"
             >
               Terms
             </Link>
             <Link
-              to="/privacy"
+              to="/privacy-policy"
               className="text-sm text-gray-500 hover:text-gray-700"
             >
               Privacy
-            </Link>
-            <Link
-              to="/help"
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
-              Help
             </Link>
           </div>
         </div>
