@@ -17,7 +17,7 @@ const FormField = ({
 }) => {
   // Handle different input types
   const renderInput = () => {
-    const baseClasses = `mt-1 block w-full rounded-md shadow-sm sm:text-sm ${
+    const baseClasses = `mt-3 block w-full rounded-md shadow-sm sm:text-sm ${
       error
         ? "border-red-300 focus:border-red-500 focus:ring-red-500"
         : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
