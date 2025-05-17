@@ -208,7 +208,6 @@ const PaymentPage = () => {
     }).format(adjustedAmount);
   };
 
-  // Render appropriate UI based on payment status
   const renderPaymentContent = () => {
     if (isLoading || paymentStatus === "processing") {
       return (
@@ -331,7 +330,7 @@ const PaymentPage = () => {
                 <span className="text-gray-600">Amount</span>
                 <span className="font-medium text-gray-800">
                   {formatCurrency(
-                    paymentData.order.amount,
+                    paymentData.order.amount / 100, // Divide by 100 if amount is in paise
                     paymentData.order.currency
                   )}
                 </span>

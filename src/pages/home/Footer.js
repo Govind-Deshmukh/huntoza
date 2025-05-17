@@ -55,17 +55,13 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-1">
             <div className="flex items-center">
-              <svg
-                className="h-8 w-8 text-blue-600"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8-2h4v2h-4V4zM12 11h4v2h-4v-2z" />
-              </svg>
-              <span className="ml-2 text-xl font-bold text-gray-900">
-                PursuitPal
-              </span>
+              <img
+                src={process.env.PUBLIC_URL + "/logo512.png"}
+                alt="PursuitPal Logo"
+                className="h-8 w-auto"
+              />
             </div>
+
             <p className="mt-2 text-sm text-gray-500">
               Your personal job hunt assistant.
             </p>

@@ -26,6 +26,54 @@ const JobFormPage = () => {
   // Determine if in edit mode based on presence of ID
   const isEditMode = !!id;
 
+  useEffect(() => {
+    // Check if we're coming from the extension
+    const url = new URL(window.location.href);
+    const fromExtension = url.searchParams.get("fromExtension") === "true";
+
+    if (fromExtension) {
+      // Listen for job data from the extension using postMessage
+      const messageHandler = (event) => {
+        // Only accept messages from the same origin
+        if (event.origin !== window.location.origin) return;
+
+        // Check if this is a job data message
+        if (event.data && event.data.type === "PURSUITPAL_JOB_DATA") {
+          const jobData = event.data.data;
+          console.log("Received job data from extension:", jobData);
+
+          // Update form state with the job data
+          setFormData({
+            ...initialFormState,
+            ...jobData,
+            applicationDate:
+              jobData.applicationDate || new Date().toISOString().slice(0, 10),
+          });
+
+          // Send a response back to the extension
+          window.postMessage(
+            {
+              responseId: event.data.messageId,
+              success: true,
+            },
+            window.location.origin
+          );
+
+          // Remove the event listener after receiving the data
+          window.removeEventListener("message", messageHandler);
+        }
+      };
+
+      // Add the event listener
+      window.addEventListener("message", messageHandler);
+
+      // Return cleanup function
+      return () => {
+        window.removeEventListener("message", messageHandler);
+      };
+    }
+  }, [initialFormState]);
+
   // Initial form state
   const initialFormState = {
     company: "",
@@ -75,6 +123,10 @@ const JobFormPage = () => {
         max: jobData.salary?.max || 0,
         currency: jobData.salary?.currency || "INR",
       },
+      notes: jobData.notes || "",
+      // Set application date to today
+      applicationDate: new Date().toISOString().slice(0, 10),
+      status: "saved", // Default to saved status
     };
 
     setFormData(updatedData);
@@ -116,6 +168,7 @@ const JobFormPage = () => {
 
       fetchJob();
     } else if (location.state?.jobData && !extensionDataReceived) {
+      // Handle data passed via location state (internal navigation)
       setFormData({
         ...initialFormState,
         ...location.state.jobData,
@@ -244,7 +297,7 @@ const JobFormPage = () => {
       onCancel={() => navigate("/applications")}
       submitText={isEditMode ? "Update Application" : "Add Application"}
     >
-      {/* Extension integration */}
+      {/* Extension integration - will show notification if data was received from extension */}
       <ExtensionIntegration onDataReceived={handleExtensionData} />
 
       {/* Basic information */}

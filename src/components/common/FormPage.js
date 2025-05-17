@@ -37,9 +37,9 @@ const FormPage = ({
               onSubmit={onSubmit}
               className="bg-white shadow rounded-lg overflow-hidden"
             >
-              <div className="px-4 py-5 sm:p-6">{children}</div>
+              <div className="px-6 py-6">{children}</div>
 
-              <div className="px-4 py-3 bg-gray-50 text-right sm:px-6 border-t border-gray-200">
+              <div className="px-6 py-4 bg-gray-50 text-right border-t border-gray-200">
                 <button
                   type="button"
                   onClick={onCancel}

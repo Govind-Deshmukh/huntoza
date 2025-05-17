@@ -108,10 +108,6 @@ const TaskFormPage = () => {
 
     let newValue = value;
 
-    if ((name === "relatedContact" || name === "relatedJob") && value === "") {
-      newValue = null;
-    }
-
     if (validationErrors[name]) {
       setValidationErrors((prev) => {
         const newErrors = { ...prev };
@@ -151,6 +147,7 @@ const TaskFormPage = () => {
       return;
     }
 
+    // Fix for the ObjectId casting error - convert empty strings to null
     const sanitizedData = {
       ...formData,
       relatedContact:

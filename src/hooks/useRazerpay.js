@@ -53,7 +53,7 @@ const useRazorpay = () => {
             key: paymentData.keyId,
             amount: paymentData.order.amount,
             currency: paymentData.order.currency || "INR",
-            name: "Job Hunt Tracker",
+            name: "PuesuitPal Tracker",
             description: "Plan Subscription",
             order_id: paymentData.order.id,
             prefill: {

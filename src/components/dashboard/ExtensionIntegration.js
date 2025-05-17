@@ -1,63 +1,41 @@
+// src/components/dashboard/ExtensionIntegration.js
 import React, { useEffect, useState } from "react";
 
 const ExtensionIntegration = ({ onDataReceived }) => {
   const [dataStatus, setDataStatus] = useState("waiting");
 
   useEffect(() => {
-    // Check for existing data in localStorage
-    const checkForExtensionData = () => {
+    const handleMessageFromExtension = (event) => {
       try {
-        const storedJobData = localStorage.getItem("pendingJobData");
-        if (storedJobData) {
-          const jobData = JSON.parse(storedJobData);
-          console.log("Found job data from extension:", jobData);
-
-          // Pass the data to the parent component
-          onDataReceived(jobData);
-
-          // Update status
-          setDataStatus("received");
-
-          // Clean up
-          localStorage.removeItem("pendingJobData");
-          return true;
+        // Only accept messages from same window and correct source/type
+        if (
+          event.source !== window ||
+          !event.data ||
+          event.data.source !== "job-hunt-extension" ||
+          event.data.type !== "SCRAPED_JOB_DATA"
+        ) {
+          return;
         }
-        return false;
+
+        const jobData = event.data.payload;
+
+        console.log("Received job data from extension:", jobData);
+
+        onDataReceived(jobData);
+        setDataStatus("received");
       } catch (error) {
-        console.error("Error processing extension job data:", error);
+        console.error("Error processing job data:", error);
         setDataStatus("error");
-        return false;
       }
     };
 
-    // Check on component mount
-    const dataFound = checkForExtensionData();
-    if (!dataFound) {
-      // Set up listener for custom event from the extension
-      const handleJobDataAvailable = (event) => {
-        if (event.detail?.source === "chromeExtension") {
-          const dataFound = checkForExtensionData();
-          if (dataFound) {
-            // Clean up event listener if data was found
-            window.removeEventListener(
-              "jobDataAvailable",
-              handleJobDataAvailable
-            );
-          }
-        }
-      };
+    window.addEventListener("message", handleMessageFromExtension);
 
-      // Register the event listener
-      window.addEventListener("jobDataAvailable", handleJobDataAvailable);
-
-      // Return cleanup function
-      return () => {
-        window.removeEventListener("jobDataAvailable", handleJobDataAvailable);
-      };
-    }
+    return () => {
+      window.removeEventListener("message", handleMessageFromExtension);
+    };
   }, [onDataReceived]);
 
-  // Only show UI when data was received
   if (dataStatus === "received") {
     return (
       <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mt-2 mb-4 flex items-center">
@@ -81,8 +59,7 @@ const ExtensionIntegration = ({ onDataReceived }) => {
     );
   }
 
-  // Don't render anything when waiting or no data
-  return null;
+  return null; // waiting
 };
 
 export default ExtensionIntegration;

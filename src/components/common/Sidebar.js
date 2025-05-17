@@ -1,4 +1,3 @@
-// src/components/common/Sidebar.js - Fixed version
 import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -10,9 +9,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const { currentPlan, loadCurrentPlan } = useData();
 
   useEffect(() => {
-    // loadCurrentPlan();
-    console.log("Current Plan:", currentPlan);
-  }, []);
+    loadCurrentPlan();
+  }, [user]);
 
   // Define navigation items
   const navItems = [
@@ -118,19 +116,29 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     },
   ];
 
+  // Check if a path is active (including partial matches for nested routes)
+  const isPathActive = (path) => {
+    if (path === "/dashboard") {
+      return location.pathname === path;
+    }
+    // For other routes, use startsWith to match nested routes
+    return location.pathname.startsWith(path);
+  };
+
   // Render nav items with active state
   const renderNavItems = () => {
     return navItems.map((item) => (
       <Link
         key={item.name}
         to={item.path}
-        className={`flex items-center px-4 py-3 text-sm ${
-          location.pathname === item.path
-            ? "bg-blue-100 text-blue-600 border-r-4 border-blue-600"
+        className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg mx-2 ${
+          isPathActive(item.path)
+            ? "bg-blue-100 text-blue-700 border-l-4 border-blue-700"
             : "text-gray-700 hover:bg-gray-100"
         } transition-colors duration-150`}
+        aria-current={isPathActive(item.path) ? "page" : undefined}
       >
-        <span className="inline-flex items-center justify-center mr-3">
+        <span className="inline-flex items-center justify-center w-6 h-6 mr-3">
           {item.icon}
         </span>
         <span>{item.name}</span>
@@ -149,6 +157,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     return "Free"; // Default to "Free" if no plan is available
   };
 
+  // Check if subscription is active with proper null handling
+  const isSubscriptionActive = () => {
+    return currentPlan?.subscription?.status === "active";
+  };
+
   return (
     <>
       {/* Mobile sidebar backdrop */}
@@ -156,28 +169,37 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         <div
           className="fixed inset-0 z-20 bg-black bg-opacity-50 lg:hidden"
           onClick={toggleSidebar}
+          aria-hidden="true"
         ></div>
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 shadow-sm transition-transform duration-300 ease-in-out transform ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 shadow-sm transition-transform duration-300 ease-in-out transform flex flex-col ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0 lg:relative lg:z-0`}
       >
         {/* Sidebar header */}
-        <div className="flex items-center justify-between px-4 py-5 border-b">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
           <div className="flex items-center">
-            <span className="text-xl font-semibold text-blue-600">
+            <svg
+              className="h-8 w-8 text-blue-600 mr-2"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8-2h4v2h-4V4zM12 11h4v2h-4v-2z" />
+            </svg>
+            <span className="text-xl font-semibold text-gray-900">
               PursuitPal
             </span>
           </div>
           <button
             onClick={toggleSidebar}
-            className="p-1 text-gray-500 rounded-md lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-2 text-gray-500 rounded-lg hover:bg-gray-100 lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Close sidebar"
           >
             <svg
-              className="w-6 h-6"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -195,54 +217,61 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
         {/* User info */}
         {user && (
-          <div className="px-4 py-4 border-b">
+          <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold shadow-sm">
                 {user.name ? user.name.charAt(0).toUpperCase() : "U"}
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-800">
+              <div className="ml-3 overflow-hidden">
+                <p className="text-sm font-medium text-gray-900 truncate">
                   {user?.name || "User"}
                 </p>
-                <p className="text-xs text-gray-500">{user?.email || ""}</p>
+                <p className="text-xs text-gray-500 truncate">
+                  {user?.email || ""}
+                </p>
               </div>
             </div>
           </div>
         )}
 
         {/* Navigation */}
-        <nav className="py-4">
-          <div className="px-4 mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
+        <nav className="py-4 flex-1 overflow-y-auto">
+          <div className="px-6 mb-3 text-xs font-semibold tracking-wider text-gray-500 uppercase">
             Main Menu
           </div>
-          {renderNavItems()}
+          <div className="space-y-1">{renderNavItems()}</div>
         </nav>
 
-        {/* Plan info */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+        {/* Plan info - positioned at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 p-4 bg-gray-50">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500">Current Plan</p>
-              <p className="text-sm font-medium text-gray-800">
-                {getPlanName()} Plan
-              </p>
+              <p className="text-xs font-medium text-gray-500">Current Plan</p>
+              <div className="flex items-center">
+                <p className="text-sm font-medium text-gray-900">
+                  {getPlanName()} Plan
+                </p>
+                {currentPlan?.subscription && (
+                  <span
+                    className={`ml-2 flex items-center text-xs ${
+                      isSubscriptionActive()
+                        ? "text-green-600"
+                        : "text-yellow-600"
+                    }`}
+                  >
+                    <span className="h-2 w-2 rounded-full bg-current mr-1"></span>
+                    {isSubscriptionActive() ? "Active" : "Expiring soon"}
+                  </span>
+                )}
+              </div>
             </div>
             <Link
               to="/subscription"
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="text-xs font-medium text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
             >
               Manage
             </Link>
           </div>
-          {currentPlan?.subscription && (
-            <div className="mt-1 text-xs text-gray-500">
-              {currentPlan.subscription.status === "active" ? (
-                <span className="text-green-600">● Active</span>
-              ) : (
-                <span className="text-yellow-600">● Expiring soon</span>
-              )}
-            </div>
-          )}
         </div>
       </aside>
     </>

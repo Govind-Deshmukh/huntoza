@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
-import useRazorpay from "../../hooks/useRazerpay"; // Import the Razorpay hook
+import useRazorpay from "../../hooks/useRazerpay";
+import AuthNavbar from "./AuthNavbar";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -208,228 +209,257 @@ const SignupPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          {step === 1 ? "Create your account" : "Complete your subscription"}
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          {step === 1 ? (
-            <>
-              Or{" "}
-              <a
-                href="/login"
-                className="font-medium text-blue-600 hover:text-blue-500"
-              >
-                sign in to your existing account
-              </a>
-            </>
-          ) : (
-            "Set up your plan and payment details"
-          )}
-        </p>
-      </div>
+    <>
+      <AuthNavbar />
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            {step === 1 ? "Create your account" : "Complete your subscription"}
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            {step === 1 ? (
+              <>
+                Or{" "}
+                <a
+                  href="/login"
+                  className="font-medium text-blue-600 hover:text-blue-500"
+                >
+                  sign in to your existing account
+                </a>
+              </>
+            ) : (
+              "Set up your plan and payment details"
+            )}
+          </p>
+        </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {/* Error message */}
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded relative">
-              {error}
-            </div>
-          )}
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            {/* Error message */}
+            {error && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded relative">
+                {error}
+              </div>
+            )}
 
-          {/* Success message */}
-          {success && (
-            <div className="mb-4 bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded relative">
-              {success}
-            </div>
-          )}
+            {/* Success message */}
+            {success && (
+              <div className="mb-4 bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded relative">
+                {success}
+              </div>
+            )}
 
-          {isLoading ? (
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-          ) : (
-            <>
-              {/* Step 1: Account Creation */}
-              {step === 1 && (
-                <form className="space-y-6" onSubmit={handleSubmit}>
-                  <div>
-                    <label
-                      htmlFor="name"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Full Name
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="name"
-                        name="name"
-                        type="text"
-                        required
-                        value={formData.name}
-                        onChange={handleChange}
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="email"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Email address
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        value={formData.email}
-                        onChange={handleChange}
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="password"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Password
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="password"
-                        name="password"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        value={formData.password}
-                        onChange={handleChange}
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        minLength="6"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="confirmPassword"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Confirm Password
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        minLength="6"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Display selected plan if available */}
-                  {planDetails && (
-                    <div className="bg-gray-50 p-4 rounded-md">
-                      <h3 className="text-sm font-medium text-gray-700">
-                        Selected Plan
-                      </h3>
-                      <div className="mt-2 flex justify-between">
-                        <span className="text-sm text-gray-500">
-                          {planDetails.name.charAt(0).toUpperCase() +
-                            planDetails.name.slice(1)}{" "}
-                          Plan
-                        </span>
-                        <span className="text-sm font-medium text-gray-900">
-                          {planDetails.name === "free"
-                            ? "Free"
-                            : `${formatCurrency(
-                                billingType === "monthly"
-                                  ? planDetails.price.monthly
-                                  : planDetails.price.yearly
-                              )}/${billingType}`}
-                        </span>
+            {isLoading ? (
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
+            ) : (
+              <>
+                {/* Step 1: Account Creation */}
+                {step === 1 && (
+                  <form className="space-y-6" onSubmit={handleSubmit}>
+                    <div>
+                      <label
+                        htmlFor="name"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Full Name
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          id="name"
+                          name="name"
+                          type="text"
+                          required
+                          value={formData.name}
+                          onChange={handleChange}
+                          className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        />
                       </div>
                     </div>
-                  )}
 
-                  <div>
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      {isLoading ? "Processing..." : "Create Account"}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* Step 2: Payment */}
-              {step === 2 && paymentData && (
-                <div className="space-y-6">
-                  <div className="bg-gray-50 p-4 rounded-md">
-                    <h3 className="text-sm font-medium text-gray-700">
-                      Order Summary
-                    </h3>
-                    <div className="mt-2 space-y-2">
-                      {/* Order summary details */}
-                      {/* ... */}
+                    <div>
+                      <label
+                        htmlFor="email"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Email address
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          id="email"
+                          name="email"
+                          type="email"
+                          autoComplete="email"
+                          required
+                          value={formData.email}
+                          onChange={handleChange}
+                          className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-4">
-                    <button
-                      onClick={handlePayment}
-                      disabled={isPaymentProcessing}
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
-                    >
-                      {isPaymentProcessing
-                        ? "Processing..."
-                        : "Complete Payment"}
-                    </button>
-
-                    {/* Keep the free plan button always enabled */}
-                    <button
-                      onClick={handleSkipPayment}
-                      className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Continue with Free Plan
-                    </button>
-                  </div>
-
-                  {error && (
-                    <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">
-                      {error}
-                      <p className="mt-1">
-                        You can try again or continue with the free plan.
-                      </p>
+                    <div>
+                      <label
+                        htmlFor="password"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Password
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          id="password"
+                          name="password"
+                          type="password"
+                          autoComplete="new-password"
+                          required
+                          value={formData.password}
+                          onChange={handleChange}
+                          className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          minLength="6"
+                        />
+                      </div>
                     </div>
-                  )}
 
-                  <p className="text-xs text-gray-500 mt-4">
-                    By completing your purchase, you agree to our Terms of
-                    Service and Privacy Policy.
-                  </p>
-                </div>
-              )}
-            </>
-          )}
+                    <div>
+                      <label
+                        htmlFor="confirmPassword"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Confirm Password
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          id="confirmPassword"
+                          name="confirmPassword"
+                          type="password"
+                          autoComplete="new-password"
+                          required
+                          value={formData.confirmPassword}
+                          onChange={handleChange}
+                          className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          minLength="6"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Display selected plan if available */}
+                    {planDetails && (
+                      <div className="bg-gray-50 p-4 rounded-md">
+                        <h3 className="text-sm font-medium text-gray-700">
+                          Selected Plan
+                        </h3>
+                        <div className="mt-2 flex justify-between">
+                          <span className="text-sm text-gray-500">
+                            {planDetails.name.charAt(0).toUpperCase() +
+                              planDetails.name.slice(1)}{" "}
+                            Plan
+                          </span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {planDetails.name === "free"
+                              ? "Free"
+                              : `${formatCurrency(
+                                  billingType === "monthly"
+                                    ? planDetails.price.monthly
+                                    : planDetails.price.yearly
+                                )}/${billingType}`}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        {isLoading ? "Processing..." : "Create Account"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Step 2: Payment */}
+                {step === 2 && paymentData && (
+                  <div className="space-y-6">
+                    <div className="bg-gray-50 p-4 rounded-md">
+                      <h3 className="text-sm font-medium text-gray-700">
+                        Order Summary
+                      </h3>
+                      <div className="mt-2 space-y-2">
+                        {/* Plan name and type */}
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Plan:</span>
+                          <span className="text-sm font-medium text-gray-900 capitalize">
+                            {planDetails?.name || "Premium"} Plan
+                          </span>
+                        </div>
+
+                        {/* Billing frequency */}
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">
+                            Billing:
+                          </span>
+                          <span className="text-sm font-medium text-gray-900 capitalize">
+                            {billingType}
+                          </span>
+                        </div>
+
+                        {/* Amount */}
+                        <div className="flex justify-between border-t border-gray-200 pt-2 mt-2">
+                          <span className="text-sm text-gray-500">Amount:</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {formatCurrency(
+                              paymentData.order.amount / 100,
+                              paymentData.order.currency
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <button
+                        onClick={handlePayment}
+                        disabled={isPaymentProcessing}
+                        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
+                      >
+                        {isPaymentProcessing
+                          ? "Processing..."
+                          : "Complete Payment"}
+                      </button>
+
+                      {/* Keep the free plan button always enabled */}
+                      <button
+                        onClick={handleSkipPayment}
+                        className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Continue with Free Plan
+                      </button>
+                    </div>
+
+                    {error && (
+                      <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">
+                        {error}
+                        <p className="mt-1">
+                          You can try again or continue with the free plan.
+                        </p>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-gray-500 mt-4">
+                      By completing your purchase, you agree to our Terms of
+                      Service and Privacy Policy.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

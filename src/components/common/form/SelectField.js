@@ -15,8 +15,11 @@ const SelectField = ({
   showEmptyOption = true,
 }) => {
   return (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700">
+    <div className="mb-4">
+      <label
+        htmlFor={id}
+        className="block text-sm font-medium text-gray-700 mb-1"
+      >
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <select

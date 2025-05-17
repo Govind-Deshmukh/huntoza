@@ -147,12 +147,18 @@ const ContactFormPage = () => {
       return;
     }
 
+    // Convert empty followUpDate to null if empty
+    const sanitizedData = {
+      ...formData,
+      followUpDate: formData.followUpDate === "" ? null : formData.followUpDate,
+    };
+
     try {
       if (isEditMode) {
-        await updateContact(id, formData);
+        await updateContact(id, sanitizedData);
         setSuccessMessage("Contact updated successfully!");
       } else {
-        await createContact(formData);
+        await createContact(sanitizedData);
         setSuccessMessage("Contact added successfully!");
         setFormData(initialFormState);
         setTagInput("");

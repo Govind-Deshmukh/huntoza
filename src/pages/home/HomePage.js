@@ -10,26 +10,28 @@ import FaqSection from "./FaqSection";
 import CtaSection from "./CtaSection";
 import Footer from "./Footer";
 import PricingSection from "./PricingSection";
+import AnnouncementBanner from "./AnnouncementBanner";
 
 const HomePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <AnnouncementBanner
+        message="🎉 We're in beta! Use PursuitPal completely free with no restrictions — for a limited time."
+        link="/register"
+        linkText="Sign Up Now"
+      />
+
       {/* Navigation */}
       <nav className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
-                <svg
-                  className="h-8 w-8 text-blue-600"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8-2h4v2h-4V4zM12 11h4v2h-4v-2z" />
-                </svg>
-                <span className="ml-2 text-xl font-bold text-gray-900">
-                  PursuitPal
-                </span>
+                <img
+                  src={process.env.PUBLIC_URL + "/logo512.png"}
+                  alt="PursuitPal Logo"
+                  className="h-12 w-auto"
+                />
               </div>
             </div>
             <div className="flex items-center">
