@@ -1,26 +1,17 @@
-import api, { setAuthToken } from "../utils/axiosConfig";
+// src/services/authService.js
+import api from "../utils/axiosConfig";
 
 // Register new user
 export const register = async (userData) => {
   const response = await api.post("/auth/register", userData);
-
-  // Set token if registration successful
-  if (response.data.token) {
-    setAuthToken(response.data.token);
-  }
-
+  // No need to handle tokens since they're in HTTP-only cookies
   return response.data;
 };
 
 // Login user
 export const login = async (email, password) => {
   const response = await api.post("/auth/login", { email, password });
-
-  // Set token if login successful
-  if (response.data.token) {
-    setAuthToken(response.data.token);
-  }
-
+  // No need to handle tokens since they're in HTTP-only cookies
   return response.data;
 };
 
@@ -30,10 +21,8 @@ export const logout = async () => {
     await api.post("/auth/logout");
   } catch (error) {
     console.error("Logout API error", error);
-  } finally {
-    // Always clear token regardless of API response
-    setAuthToken(null);
   }
+  // Cookies are cleared by the server
 };
 
 // Get current user
@@ -42,16 +31,9 @@ export const getCurrentUser = async () => {
   return response.data.user;
 };
 
-// Refresh token
-export const refreshToken = async (refreshTokenValue) => {
-  const response = await api.post("/auth/refresh-token", {
-    refreshToken: refreshTokenValue,
-  });
-
-  if (response.data.token) {
-    setAuthToken(response.data.token);
-  }
-
+// Refresh token (now handled automatically by axios interceptor)
+export const refreshToken = async () => {
+  const response = await api.post("/auth/refresh-token");
   return response.data;
 };
 
@@ -66,12 +48,7 @@ export const resetPassword = async (token, password) => {
   const response = await api.post(`/auth/reset-password/${token}`, {
     password,
   });
-
-  // Set token if reset returns a new token
-  if (response.data.token) {
-    setAuthToken(response.data.token);
-  }
-
+  // No need to handle tokens since they're in HTTP-only cookies
   return response.data;
 };
 
@@ -93,11 +70,6 @@ export const updatePassword = async (currentPassword, newPassword) => {
     currentPassword,
     newPassword,
   });
-
-  // Update token if new one is returned
-  if (response.data.token) {
-    setAuthToken(response.data.token);
-  }
-
+  // No need to handle tokens since they're in HTTP-only cookies
   return response.data;
 };

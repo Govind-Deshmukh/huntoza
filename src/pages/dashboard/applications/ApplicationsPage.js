@@ -1,27 +1,33 @@
-// src/pages/dashboard/applications/ApplicationsPage.js
+// src/pages/dashboard/ApplicationsPage.js
 import React, { useState, useEffect, useCallback } from "react";
-import DashboardLayout from "../../../components/dashboard/DashboardLayout";
-import { useData } from "../../../context/DataContext";
-import ApplicationsHeader from "../../../components/dashboard/applications/ApplicationsHeader";
-import ApplicationsFilters from "../../../components/dashboard/applications/ApplicationsFilters";
-import ApplicationsList from "../../../components/dashboard/applications/ApplicationsList";
-import EmptyApplicationsState from "../../../components/dashboard/applications/EmptyApplicationsState";
-import Pagination from "../../../components/common/Pagination";
-import LoadingSpinner from "../../../components/common/LoadingSpinner";
-import ErrorAlert from "../../../components/common/ErrorAlert";
+import { useAppDispatch, useAppSelector } from "../../hooks/redux";
+import {
+  loadJobs,
+  createJob,
+  updateJob,
+  deleteJob,
+  clearError,
+} from "../../store/slices/jobsSlice";
+
+import DashboardLayout from "../../components/dashboard/DashboardLayout";
+import ApplicationsHeader from "../../components/dashboard/applications/ApplicationsHeader";
+import ApplicationsFilters from "../../components/dashboard/applications/ApplicationsFilters";
+import ApplicationsList from "../../components/dashboard/applications/ApplicationsList";
+import EmptyApplicationsState from "../../components/dashboard/applications/EmptyApplicationsState";
+import Pagination from "../../components/common/Pagination";
+import ConfirmationModal from "../../components/common/ConfirmationModal";
+import LoadingSpinner from "../../components/common/LoadingSpinner";
+import ErrorAlert from "../../components/common/ErrorAlert";
 
 const ApplicationsPage = () => {
-  const {
-    jobs,
-    jobsPagination,
-    loadJobs,
-    updateJob,
-    deleteJob,
-    isLoading,
-    error,
-  } = useData();
+  const dispatch = useAppDispatch();
 
-  // State for filtering and sorting
+  // Redux state
+  const { jobs, loading, error, pagination } = useAppSelector(
+    (state) => state.jobs
+  );
+
+  // Local state for filters and UI
   const [filters, setFilters] = useState({
     status: "all",
     jobType: "all",
@@ -30,56 +36,88 @@ const ApplicationsPage = () => {
     favorite: "",
   });
 
-  // Current page
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    jobId: null,
+    jobTitle: "",
+  });
 
-  // Load jobs with defined callback to avoid infinite loop
-  const fetchJobs = useCallback(() => {
-    loadJobs(filters, currentPage);
-  }, [loadJobs, filters, currentPage]);
-
-  // Load jobs on component mount and when filters change
+  // Load jobs effect
   useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+    dispatch(loadJobs({ filters, page: currentPage, limit: 10 }));
+  }, [dispatch, filters, currentPage]);
 
   // Handle filter changes
-  const handleFilterChange = (e) => {
+  const handleFilterChange = useCallback((e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
     setCurrentPage(1); // Reset to first page on filter change
-  };
+  }, []);
 
   // Handle status change
-  const handleStatusChange = async (jobId, newStatus) => {
-    try {
-      await updateJob(jobId, { status: newStatus });
-    } catch (err) {
-      console.error("Error updating job status:", err);
-    }
-  };
+  const handleStatusChange = useCallback(
+    async (jobId, newStatus) => {
+      try {
+        await dispatch(
+          updateJob({ jobId, jobData: { status: newStatus } })
+        ).unwrap();
+      } catch (err) {
+        console.error("Error updating job status:", err);
+      }
+    },
+    [dispatch]
+  );
 
   // Handle favorite toggle
-  const handleToggleFavorite = async (jobId, currentFavorite) => {
-    try {
-      await updateJob(jobId, { favorite: !currentFavorite });
-    } catch (err) {
-      console.error("Error toggling favorite:", err);
-    }
-  };
-
-  // Handle job deletion
-  const handleDeleteJob = async (jobId) => {
-    if (
-      window.confirm("Are you sure you want to delete this job application?")
-    ) {
+  const handleToggleFavorite = useCallback(
+    async (jobId, currentFavorite) => {
       try {
-        await deleteJob(jobId);
+        await dispatch(
+          updateJob({
+            jobId,
+            jobData: { favorite: !currentFavorite },
+          })
+        ).unwrap();
       } catch (err) {
-        console.error("Error deleting job:", err);
+        console.error("Error toggling favorite:", err);
       }
+    },
+    [dispatch]
+  );
+
+  // Handle delete job - show confirmation modal
+  const handleDeleteJob = useCallback(
+    (jobId) => {
+      const job = jobs.find((j) => j._id === jobId);
+      setDeleteModal({
+        isOpen: true,
+        jobId,
+        jobTitle: job ? `${job.position} at ${job.company}` : "this job",
+      });
+    },
+    [jobs]
+  );
+
+  // Confirm delete job
+  const confirmDeleteJob = useCallback(async () => {
+    try {
+      await dispatch(deleteJob(deleteModal.jobId)).unwrap();
+      setDeleteModal({ isOpen: false, jobId: null, jobTitle: "" });
+    } catch (err) {
+      console.error("Error deleting job:", err);
     }
-  };
+  }, [dispatch, deleteModal.jobId]);
+
+  // Cancel delete
+  const cancelDelete = useCallback(() => {
+    setDeleteModal({ isOpen: false, jobId: null, jobTitle: "" });
+  }, []);
+
+  // Clear error
+  const handleClearError = useCallback(() => {
+    dispatch(clearError());
+  }, [dispatch]);
 
   // Format job type for display
   const formatJobType = (jobType) => {
@@ -143,18 +181,23 @@ const ApplicationsPage = () => {
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <ApplicationsHeader />
+
           <ApplicationsFilters
             filters={filters}
             onFilterChange={handleFilterChange}
           />
-          <ErrorAlert message={error} />
 
-          {isLoading ? (
+          {/* Error display */}
+          {error && <ErrorAlert message={error} onClose={handleClearError} />}
+
+          {/* Loading state */}
+          {loading ? (
             <LoadingSpinner />
           ) : jobs.length === 0 ? (
             <EmptyApplicationsState />
           ) : (
             <div>
+              {/* Jobs list */}
               <ApplicationsList
                 jobs={jobs}
                 getStatusBadge={getStatusBadge}
@@ -165,17 +208,29 @@ const ApplicationsPage = () => {
                 handleDeleteJob={handleDeleteJob}
               />
 
-              {jobsPagination.numOfPages > 1 && (
+              {/* Pagination */}
+              {pagination.totalPages > 1 && (
                 <Pagination
                   currentPage={currentPage}
-                  totalPages={jobsPagination.numOfPages}
-                  totalItems={jobsPagination.totalItems}
+                  totalPages={pagination.totalPages}
+                  totalItems={pagination.totalItems}
                   itemsPerPage={jobs.length}
                   onPageChange={setCurrentPage}
                 />
               )}
             </div>
           )}
+
+          {/* Delete Confirmation Modal */}
+          <ConfirmationModal
+            isOpen={deleteModal.isOpen}
+            title="Delete Job Application"
+            message={`Are you sure you want to delete "${deleteModal.jobTitle}"? This action cannot be undone.`}
+            confirmText="Delete"
+            cancelText="Cancel"
+            onConfirm={confirmDeleteJob}
+            onCancel={cancelDelete}
+          />
         </div>
       </div>
     </DashboardLayout>
