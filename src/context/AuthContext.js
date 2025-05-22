@@ -1,3 +1,4 @@
+// src/context/AuthContext.js
 import React, {
   createContext,
   useState,
@@ -6,7 +7,6 @@ import React, {
   useCallback,
 } from "react";
 import * as authService from "../services/authService";
-import { setAuthToken } from "../utils/axiosConfig";
 import {
   showSuccessToast,
   showErrorToast,
@@ -17,45 +17,35 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true); // Start with loading to check token
+  const [isLoading, setIsLoading] = useState(true); // Start with loading to check for existing session
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  console.log(user);
 
   // Clear error
   const clearError = useCallback(() => setError(null), []);
 
-  // Load user from token
-  const loadUserFromToken = useCallback(async () => {
+  // Load user from server (check if session exists)
+  const loadUserFromServer = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-
-      // Set auth token header
-      setAuthToken(token);
-
-      // Load user data
+      setIsLoading(true);
+      // Try to get current user using HTTP-only cookies
       const userData = await authService.getCurrentUser();
       setUser(userData);
       setIsAuthenticated(true);
     } catch (err) {
-      // Token might be invalid, clear it
-      setAuthToken(null);
-      console.error("Error loading user:", err);
-      // Don't show a toast for this since it might be a normal session expiration
+      // No valid session found, user needs to login
+      setUser(null);
+      setIsAuthenticated(false);
+      console.log("No valid session found");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Check for token and load user on mount
+  // Check for existing session on mount
   useEffect(() => {
-    loadUserFromToken();
-  }, [loadUserFromToken]);
+    loadUserFromServer();
+  }, [loadUserFromServer]);
 
   // Register user
   const register = useCallback(
@@ -91,12 +81,6 @@ export const AuthProvider = ({ children }) => {
         clearError();
 
         const data = await authService.login(email, password);
-
-        // Store refresh token in localStorage if it's returned
-        if (data.refreshToken) {
-          localStorage.setItem("refreshToken", data.refreshToken);
-        }
-
         setUser(data.user);
         setIsAuthenticated(true);
 
@@ -128,7 +112,6 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       setIsLoading(false);
-      localStorage.removeItem("refreshToken");
     }
   }, []);
 
@@ -163,19 +146,12 @@ export const AuthProvider = ({ children }) => {
 
         const data = await authService.resetPassword(token, password);
 
-        // If token is returned, user is automatically logged in
-        if (data.token) {
-          // Store refresh token in localStorage if it's returned
-          if (data.refreshToken) {
-            localStorage.setItem("refreshToken", data.refreshToken);
-          }
-
-          // Get updated user profile
-          const userData = await authService.getCurrentUser();
-          setUser(userData);
-          setIsAuthenticated(true);
-          showSuccessToast("Password reset successful!");
-        }
+        // After successful password reset, user is automatically logged in
+        // Get updated user profile
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
+        setIsAuthenticated(true);
+        showSuccessToast("Password reset successful!");
 
         return data;
       } catch (err) {
@@ -241,11 +217,6 @@ export const AuthProvider = ({ children }) => {
           newPassword
         );
 
-        // Store refresh token in localStorage if it's returned
-        if (data.refreshToken) {
-          localStorage.setItem("refreshToken", data.refreshToken);
-        }
-
         showSuccessToast("Password updated successfully!");
         return data;
       } catch (err) {
@@ -261,37 +232,11 @@ export const AuthProvider = ({ children }) => {
     [clearError]
   );
 
-  // Refresh user token
-  const refreshToken = useCallback(async () => {
-    try {
-      const refreshTokenValue = localStorage.getItem("refreshToken");
-      if (!refreshTokenValue) {
-        throw new Error("No refresh token found");
-      }
-
-      const data = await authService.refreshToken(refreshTokenValue);
-
-      if (data.token) {
-        setAuthToken(data.token);
-        // If new refreshToken is returned, update it
-        if (data.refreshToken) {
-          localStorage.setItem("refreshToken", data.refreshToken);
-        }
-        return data.token;
-      }
-
-      throw new Error("Failed to refresh token");
-    } catch (err) {
-      console.error("Token refresh error:", err);
-      // Clear auth on refresh failure
-      setAuthToken(null);
-      setUser(null);
-      setIsAuthenticated(false);
-      localStorage.removeItem("refreshToken");
-
-      // Don't show toast for token refresh issues as they're handled elsewhere
-      throw err;
-    }
+  // Handle session expiration
+  const handleSessionExpiration = useCallback(() => {
+    setUser(null);
+    setIsAuthenticated(false);
+    showErrorToast("Your session has expired. Please log in again.");
   }, []);
 
   // Context value
@@ -309,8 +254,8 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     updatePassword,
     clearError,
-    refreshToken,
-    loadUserFromToken,
+    loadUserFromServer,
+    handleSessionExpiration,
   };
 
   return (
