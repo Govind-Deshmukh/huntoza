@@ -1,14 +1,19 @@
 // src/pages/dashboard/applications/ApplicationsPage.js
 import React, { useState, useEffect, useCallback } from "react";
-import DashboardLayout from "../../../components/dashboard/DashboardLayout";
+import { useNavigate } from "react-router-dom";
 import { useData } from "../../../context/DataContext";
+import DashboardLayout from "../../../components/dashboard/DashboardLayout";
 import ApplicationsHeader from "../../../components/dashboard/applications/ApplicationsHeader";
 import ApplicationsFilters from "../../../components/dashboard/applications/ApplicationsFilters";
 import ApplicationsList from "../../../components/dashboard/applications/ApplicationsList";
 import EmptyApplicationsState from "../../../components/dashboard/applications/EmptyApplicationsState";
 import Pagination from "../../../components/common/Pagination";
+import ConfirmationModal from "../../../components/common/ConfirmationModal";
+import LoadingSpinner from "../../../components/common/LoadingSpinner";
+import ErrorAlert from "../../../components/common/ErrorAlert";
 
 const ApplicationsPage = () => {
+  const navigate = useNavigate();
   const {
     jobs,
     jobsPagination,
@@ -17,6 +22,7 @@ const ApplicationsPage = () => {
     deleteJob,
     isLoading,
     error,
+    clearError,
   } = useData();
 
   // State for filtering and sorting
@@ -30,6 +36,8 @@ const ApplicationsPage = () => {
 
   // Current page
   const [currentPage, setCurrentPage] = useState(1);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState(null);
 
   // Load jobs with defined callback to avoid infinite loop
   const fetchJobs = useCallback(() => {
@@ -69,13 +77,19 @@ const ApplicationsPage = () => {
   };
 
   // Handle job deletion
-  const handleDeleteJob = async (jobId) => {
-    if (
-      window.confirm("Are you sure you want to delete this job application?")
-    ) {
+  const handleDeleteJob = (jobId) => {
+    const job = jobs.find((j) => j._id === jobId);
+    setJobToDelete(job);
+    setShowDeleteConfirm(true);
+  };
+
+  // Confirm delete job
+  const confirmDeleteJob = async () => {
+    if (jobToDelete && jobToDelete._id) {
       try {
-        await deleteJob(jobId);
-        // Jobs list will be updated through the context
+        await deleteJob(jobToDelete._id);
+        setShowDeleteConfirm(false);
+        setJobToDelete(null);
       } catch (err) {
         console.error("Error deleting job:", err);
       }
@@ -151,35 +165,11 @@ const ApplicationsPage = () => {
           />
 
           {/* Error display */}
-          {error && (
-            <div className="rounded-md bg-red-50 p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-5 w-5 text-red-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-red-800">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
+          {error && <ErrorAlert message={error} />}
 
           {/* Loading state */}
           {isLoading ? (
-            <div className="bg-white shadow rounded-lg p-6 flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
+            <LoadingSpinner />
           ) : jobs.length === 0 ? (
             <EmptyApplicationsState />
           ) : (
@@ -207,6 +197,20 @@ const ApplicationsPage = () => {
               )}
             </div>
           )}
+
+          {/* Delete Confirmation Modal */}
+          <ConfirmationModal
+            isOpen={showDeleteConfirm}
+            title="Delete job application"
+            message="Are you sure you want to delete this job application? This action cannot be undone."
+            confirmText="Delete"
+            cancelText="Cancel"
+            onConfirm={confirmDeleteJob}
+            onCancel={() => {
+              setShowDeleteConfirm(false);
+              setJobToDelete(null);
+            }}
+          />
         </div>
       </div>
     </DashboardLayout>
