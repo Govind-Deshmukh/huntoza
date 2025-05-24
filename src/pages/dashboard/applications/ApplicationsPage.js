@@ -1,15 +1,15 @@
 // src/pages/dashboard/ApplicationsPage.js
 import React, { useState, useEffect, useCallback } from "react";
-import { useAppDispatch, useAppSelector } from "../../hooks/redux";
+import { useAppDispatch, useAppSelector } from "../../../hooks/redux";
 import {
   loadJobs,
   createJob,
   updateJob,
   deleteJob,
   clearError,
-} from "../../store/slices/jobsSlice";
+} from "../../../store/slices/jobsSlice";
 
-import DashboardLayout from "../../components/dashboard/DashboardLayout";
+import DashboardLayout from "../../../components/dashboard/DashboardLayout";
 import ApplicationsHeader from "../../components/dashboard/applications/ApplicationsHeader";
 import ApplicationsFilters from "../../components/dashboard/applications/ApplicationsFilters";
 import ApplicationsList from "../../components/dashboard/applications/ApplicationsList";

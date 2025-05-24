@@ -1,5 +1,6 @@
 // src/store/index.js
 import { configureStore } from "@reduxjs/toolkit";
+import authSlice from "./slices/authSlice";
 import jobsSlice from "./slices/jobsSlice";
 import tasksSlice from "./slices/tasksSlice";
 import contactsSlice from "./slices/contactsSlice";
@@ -9,6 +10,7 @@ import uiSlice from "./slices/uiSlice";
 
 export const store = configureStore({
   reducer: {
+    auth: authSlice,
     jobs: jobsSlice,
     tasks: tasksSlice,
     contacts: contactsSlice,
