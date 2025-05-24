@@ -1,9 +1,12 @@
+// src/components/common/Navbar.js
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useSelector, useDispatch } from "react-redux";
+import { logout } from "../../store/slices/authSlice";
 
 const Navbar = ({ toggleSidebar }) => {
-  const { user, logout } = useAuth();
+  const { user } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -24,7 +27,7 @@ const Navbar = ({ toggleSidebar }) => {
 
   // Handle logout
   const handleLogout = async () => {
-    await logout();
+    await dispatch(logout());
     navigate("/login");
   };
 

@@ -1,84 +1,97 @@
-// Enhanced DashboardPage with API integration - Fixed version
-import React, { useEffect, useState, useCallback } from "react";
+// src/pages/dashboard/DashboardPage.js
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
-import { useAuth } from "../../context/AuthContext";
-import { useData } from "../../context/DataContext";
+import LoadingSpinner from "../../components/common/LoadingSpinner";
+import ErrorAlert from "../../components/common/ErrorAlert";
+import { loadDashboardData } from "../../store/slices/analyticsSlice";
+import { loadJobs } from "../../store/slices/jobsSlice";
+import { loadTasks } from "../../store/slices/tasksSlice";
 
 const DashboardPage = () => {
-  const { user } = useAuth();
+  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
   const {
-    dashboardAnalytics,
-    loadDashboardData,
-    currentPlan,
-    jobs,
-    loadJobs,
-    tasks,
-    loadTasks,
-    isLoading,
-    error,
-  } = useData();
+    dashboardData,
+    loading: analyticsLoading,
+    error: analyticsError,
+  } = useSelector((state) => state.analytics);
+  const { jobs } = useSelector((state) => state.jobs);
+  const { tasks } = useSelector((state) => state.tasks);
+  const isLoading = analyticsLoading;
 
-  const [recentApplications, setRecentApplications] = useState([]);
-  const [upcomingTasks, setUpcomingTasks] = useState([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // FIX: Use a callback for loading all dashboard data
-  const initializeDashboard = useCallback(async () => {
-    // Skip if already initialized
-    if (isInitialized) return;
-
-    try {
-      // Load dashboard data
-      await loadDashboardData();
-
-      // Load recent jobs with limit
-      await loadJobs({ sort: "newest" }, 1, 4);
-
-      // Load upcoming tasks with custom filters
-      await loadTasks({ status: "pending", sort: "dueDate-asc" }, 1, 3);
-
-      // Mark as initialized to prevent repeated loading
-      setIsInitialized(true);
-    } catch (err) {
-      console.error("Error initializing dashboard:", err);
-    }
-  }, [loadDashboardData, loadJobs, loadTasks, isInitialized]);
-
-  // FIX: Only load data once on component mount
   useEffect(() => {
-    initializeDashboard();
-  }, [initializeDashboard]);
+    // Load dashboard analytics data
+    dispatch(loadDashboardData());
 
-  // Process jobs data for display
-  useEffect(() => {
-    if (jobs && jobs.length > 0) {
-      const formattedJobs = jobs.map((job) => ({
-        id: job._id,
-        company: job.company,
-        position: job.position,
-        date: new Date(job.applicationDate).toISOString().slice(0, 10),
-        status: job.status.charAt(0).toUpperCase() + job.status.slice(1),
-        statusColor: getStatusColor(job.status),
-      }));
-      setRecentApplications(formattedJobs);
+    // Load recent jobs with limit
+    dispatch(
+      loadJobs({
+        filters: { sort: "newest" },
+        page: 1,
+        limit: 4,
+      })
+    );
+
+    // Load upcoming tasks with custom filters
+    dispatch(
+      loadTasks({
+        filters: { status: "pending", sort: "dueDate-asc" },
+        page: 1,
+        limit: 3,
+      })
+    );
+  }, [dispatch]);
+
+  // Generate status badge with appropriate color
+  const getStatusBadge = (status) => {
+    let bgColor;
+    switch (status) {
+      case "applied":
+        bgColor = "bg-blue-100 text-blue-800";
+        break;
+      case "screening":
+        bgColor = "bg-purple-100 text-purple-800";
+        break;
+      case "interview":
+        bgColor = "bg-yellow-100 text-yellow-800";
+        break;
+      case "offer":
+        bgColor = "bg-green-100 text-green-800";
+        break;
+      case "rejected":
+        bgColor = "bg-red-100 text-red-800";
+        break;
+      case "withdrawn":
+        bgColor = "bg-gray-100 text-gray-800";
+        break;
+      case "saved":
+        bgColor = "bg-indigo-100 text-indigo-800";
+        break;
+      default:
+        bgColor = "bg-gray-100 text-gray-800";
     }
-  }, [jobs]);
+    return (
+      <span
+        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${bgColor}`}
+      >
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
 
-  // Process tasks data for display
-  useEffect(() => {
-    if (tasks && tasks.length > 0) {
-      const formattedTasks = tasks.map((task) => ({
-        id: task._id,
-        title: task.title,
-        date: formatTaskDate(task.dueDate),
-        type: formatTaskCategory(task.category),
-      }));
-      setUpcomingTasks(formattedTasks);
-    }
-  }, [tasks]);
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
-  // Helper function to format task date for display
+  // Format task due date for display
   const formatTaskDate = (dateString) => {
     if (!dateString) return "No due date";
 
@@ -108,40 +121,9 @@ const DashboardPage = () => {
     }
   };
 
-  // Helper function to format task category
-  const formatTaskCategory = (category) => {
-    if (!category) return "Task";
-
-    const categoryMap = {
-      application: "Application",
-      networking: "Networking",
-      "interview-prep": "Interview",
-      "follow-up": "Follow-up",
-      "skill-development": "Learning",
-      other: "Task",
-    };
-
-    return categoryMap[category] || "Task";
-  };
-
-  // Helper function to get status color
-  const getStatusColor = (status) => {
-    const colorMap = {
-      applied: "bg-blue-100 text-blue-800",
-      screening: "bg-purple-100 text-purple-800",
-      interview: "bg-yellow-100 text-yellow-800",
-      offer: "bg-green-100 text-green-800",
-      rejected: "bg-red-100 text-red-800",
-      withdrawn: "bg-gray-100 text-gray-800",
-      saved: "bg-indigo-100 text-indigo-800",
-    };
-
-    return colorMap[status] || "bg-gray-100 text-gray-800";
-  };
-
   // Get analytics stats from real data
   const getAnalyticsStats = () => {
-    if (!dashboardAnalytics || !dashboardAnalytics.applicationStats) {
+    if (!dashboardData || !dashboardData.applicationStats) {
       return [
         { name: "Total Applications", value: "0", icon: applicationIcon() },
         { name: "Active Applications", value: "0", icon: activeIcon() },
@@ -150,7 +132,7 @@ const DashboardPage = () => {
       ];
     }
 
-    const stats = dashboardAnalytics.applicationStats;
+    const stats = dashboardData.applicationStats;
 
     // Calculate active applications (applied + screening + interview)
     const activeApps =
@@ -254,11 +236,11 @@ const DashboardPage = () => {
           </p>
         </div>
 
+        {analyticsError && <ErrorAlert message={analyticsError} />}
+
         {/* Stats cards */}
         {isLoading ? (
-          <div className="flex justify-center my-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
+          <LoadingSpinner />
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -323,30 +305,26 @@ const DashboardPage = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {recentApplications.length > 0 ? (
-                          recentApplications.map((app) => (
-                            <tr key={app.id}>
+                        {jobs.length > 0 ? (
+                          jobs.map((job) => (
+                            <tr key={job._id}>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <div className="text-sm font-medium text-gray-900">
-                                  {app.company}
+                                  {job.company}
                                 </div>
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <div className="text-sm text-gray-900">
-                                  {app.position}
+                                  {job.position}
                                 </div>
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <div className="text-sm text-gray-500">
-                                  {app.date}
+                                  {formatDate(job.applicationDate)}
                                 </div>
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
-                                <span
-                                  className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${app.statusColor}`}
-                                >
-                                  {app.status}
-                                </span>
+                                {getStatusBadge(job.status)}
                               </td>
                             </tr>
                           ))
@@ -384,29 +362,38 @@ const DashboardPage = () => {
                 </div>
                 <div className="p-4">
                   <ul className="divide-y divide-gray-200">
-                    {upcomingTasks.length > 0 ? (
-                      upcomingTasks.map((task) => (
-                        <li key={task.id} className="py-3">
+                    {tasks.length > 0 ? (
+                      tasks.map((task) => (
+                        <li key={task._id} className="py-3">
                           <div className="flex items-start">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">
                                 {task.title}
                               </p>
                               <p className="text-sm text-gray-500">
-                                {task.date}
+                                {formatTaskDate(task.dueDate)}
                               </p>
                             </div>
                             <div>
                               <span
                                 className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  task.type === "Interview"
+                                  task.category === "interview-prep"
                                     ? "bg-purple-100 text-purple-800"
-                                    : task.type === "Follow-up"
+                                    : task.category === "follow-up"
                                     ? "bg-blue-100 text-blue-800"
                                     : "bg-gray-100 text-gray-800"
                                 }`}
                               >
-                                {task.type}
+                                {task.category
+                                  ? task.category
+                                      .split("-")
+                                      .map(
+                                        (word) =>
+                                          word.charAt(0).toUpperCase() +
+                                          word.slice(1)
+                                      )
+                                      .join(" ")
+                                  : "Task"}
                               </span>
                             </div>
                           </div>

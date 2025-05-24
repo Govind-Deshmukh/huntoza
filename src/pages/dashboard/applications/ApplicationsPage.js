@@ -1,33 +1,30 @@
-// src/pages/dashboard/ApplicationsPage.js
+// src/pages/dashboard/applications/ApplicationsPage.js
 import React, { useState, useEffect, useCallback } from "react";
-import { useAppDispatch, useAppSelector } from "../../../hooks/redux";
-import {
-  loadJobs,
-  createJob,
-  updateJob,
-  deleteJob,
-  clearError,
-} from "../../../store/slices/jobsSlice";
-
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useData } from "../../../context/DataContext";
 import DashboardLayout from "../../../components/dashboard/DashboardLayout";
-import ApplicationsHeader from "../../components/dashboard/applications/ApplicationsHeader";
-import ApplicationsFilters from "../../components/dashboard/applications/ApplicationsFilters";
-import ApplicationsList from "../../components/dashboard/applications/ApplicationsList";
-import EmptyApplicationsState from "../../components/dashboard/applications/EmptyApplicationsState";
-import Pagination from "../../components/common/Pagination";
-import ConfirmationModal from "../../components/common/ConfirmationModal";
-import LoadingSpinner from "../../components/common/LoadingSpinner";
-import ErrorAlert from "../../components/common/ErrorAlert";
+import ApplicationsHeader from "../../../components/dashboard/applications/ApplicationsHeader";
+import ApplicationsFilters from "../../../components/dashboard/applications/ApplicationsFilters";
+import ApplicationsList from "../../../components/dashboard/applications/ApplicationsList";
+import EmptyApplicationsState from "../../../components/dashboard/applications/EmptyApplicationsState";
+import Pagination from "../../../components/common/Pagination";
+import LoadingSpinner from "../../../components/common/LoadingSpinner";
+import ErrorAlert from "../../../components/common/ErrorAlert";
 
 const ApplicationsPage = () => {
-  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const {
+    jobs,
+    jobsPagination,
+    loadJobs,
+    updateJob,
+    deleteJob,
+    isLoading,
+    error,
+    clearError,
+  } = useData();
 
-  // Redux state
-  const { jobs, loading, error, pagination } = useAppSelector(
-    (state) => state.jobs
-  );
-
-  // Local state for filters and UI
+  // State for filtering and sorting
   const [filters, setFilters] = useState({
     status: "all",
     jobType: "all",
@@ -36,88 +33,67 @@ const ApplicationsPage = () => {
     favorite: "",
   });
 
+  // Current page
   const [currentPage, setCurrentPage] = useState(1);
-  const [deleteModal, setDeleteModal] = useState({
-    isOpen: false,
-    jobId: null,
-    jobTitle: "",
-  });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState(null);
 
-  // Load jobs effect
+  // Load jobs with defined callback to avoid infinite loop
+  const fetchJobs = useCallback(() => {
+    loadJobs(filters, currentPage);
+  }, [loadJobs, filters, currentPage]);
+
+  // Load jobs on component mount and when filters change
   useEffect(() => {
-    dispatch(loadJobs({ filters, page: currentPage, limit: 10 }));
-  }, [dispatch, filters, currentPage]);
+    fetchJobs();
+  }, [fetchJobs]);
 
   // Handle filter changes
-  const handleFilterChange = useCallback((e) => {
+  const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
     setCurrentPage(1); // Reset to first page on filter change
-  }, []);
+  };
 
   // Handle status change
-  const handleStatusChange = useCallback(
-    async (jobId, newStatus) => {
-      try {
-        await dispatch(
-          updateJob({ jobId, jobData: { status: newStatus } })
-        ).unwrap();
-      } catch (err) {
-        console.error("Error updating job status:", err);
-      }
-    },
-    [dispatch]
-  );
+  const handleStatusChange = async (jobId, newStatus) => {
+    try {
+      await updateJob(jobId, { status: newStatus });
+      // Jobs list will be updated through the context
+    } catch (err) {
+      console.error("Error updating job status:", err);
+    }
+  };
 
   // Handle favorite toggle
-  const handleToggleFavorite = useCallback(
-    async (jobId, currentFavorite) => {
-      try {
-        await dispatch(
-          updateJob({
-            jobId,
-            jobData: { favorite: !currentFavorite },
-          })
-        ).unwrap();
-      } catch (err) {
-        console.error("Error toggling favorite:", err);
-      }
-    },
-    [dispatch]
-  );
+  const handleToggleFavorite = async (jobId, currentFavorite) => {
+    try {
+      await updateJob(jobId, { favorite: !currentFavorite });
+      // Jobs list will be updated through the context
+    } catch (err) {
+      console.error("Error toggling favorite:", err);
+    }
+  };
 
-  // Handle delete job - show confirmation modal
-  const handleDeleteJob = useCallback(
-    (jobId) => {
-      const job = jobs.find((j) => j._id === jobId);
-      setDeleteModal({
-        isOpen: true,
-        jobId,
-        jobTitle: job ? `${job.position} at ${job.company}` : "this job",
-      });
-    },
-    [jobs]
-  );
+  // Handle job deletion
+  const handleDeleteJob = (jobId) => {
+    const job = jobs.find((j) => j._id === jobId);
+    setJobToDelete(job);
+    setShowDeleteConfirm(true);
+  };
 
   // Confirm delete job
-  const confirmDeleteJob = useCallback(async () => {
-    try {
-      await dispatch(deleteJob(deleteModal.jobId)).unwrap();
-      setDeleteModal({ isOpen: false, jobId: null, jobTitle: "" });
-    } catch (err) {
-      console.error("Error deleting job:", err);
+  const confirmDeleteJob = async () => {
+    if (jobToDelete && jobToDelete._id) {
+      try {
+        await deleteJob(jobToDelete._id);
+        setShowDeleteConfirm(false);
+        setJobToDelete(null);
+      } catch (err) {
+        console.error("Error deleting job:", err);
+      }
     }
-  }, [dispatch, deleteModal.jobId]);
-
-  // Cancel delete
-  const cancelDelete = useCallback(() => {
-    setDeleteModal({ isOpen: false, jobId: null, jobTitle: "" });
-  }, []);
-
-  // Clear error
-  const handleClearError = useCallback(() => {
-    dispatch(clearError());
-  }, [dispatch]);
+  };
 
   // Format job type for display
   const formatJobType = (jobType) => {
@@ -188,10 +164,10 @@ const ApplicationsPage = () => {
           />
 
           {/* Error display */}
-          {error && <ErrorAlert message={error} onClose={handleClearError} />}
+          {error && <ErrorAlert message={error} />}
 
           {/* Loading state */}
-          {loading ? (
+          {isLoading ? (
             <LoadingSpinner />
           ) : jobs.length === 0 ? (
             <EmptyApplicationsState />
@@ -209,11 +185,11 @@ const ApplicationsPage = () => {
               />
 
               {/* Pagination */}
-              {pagination.totalPages > 1 && (
+              {jobsPagination.numOfPages > 1 && (
                 <Pagination
                   currentPage={currentPage}
-                  totalPages={pagination.totalPages}
-                  totalItems={pagination.totalItems}
+                  totalPages={jobsPagination.numOfPages}
+                  totalItems={jobsPagination.totalItems}
                   itemsPerPage={jobs.length}
                   onPageChange={setCurrentPage}
                 />
@@ -222,15 +198,75 @@ const ApplicationsPage = () => {
           )}
 
           {/* Delete Confirmation Modal */}
-          <ConfirmationModal
-            isOpen={deleteModal.isOpen}
-            title="Delete Job Application"
-            message={`Are you sure you want to delete "${deleteModal.jobTitle}"? This action cannot be undone.`}
-            confirmText="Delete"
-            cancelText="Cancel"
-            onConfirm={confirmDeleteJob}
-            onCancel={cancelDelete}
-          />
+          {showDeleteConfirm && jobToDelete && (
+            <div className="fixed z-10 inset-0 overflow-y-auto">
+              <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div
+                  className="fixed inset-0 transition-opacity"
+                  aria-hidden="true"
+                >
+                  <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+
+                <span
+                  className="hidden sm:inline-block sm:align-middle sm:h-screen"
+                  aria-hidden="true"
+                >
+                  &#8203;
+                </span>
+
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                  <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div className="sm:flex sm:items-start">
+                      <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <svg
+                          className="h-6 w-6 text-red-600"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                          />
+                        </svg>
+                      </div>
+                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 className="text-lg leading-6 font-medium text-gray-900">
+                          Delete job application
+                        </h3>
+                        <div className="mt-2">
+                          <p className="text-sm text-gray-500">
+                            Are you sure you want to delete this job
+                            application? This action cannot be undone.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      type="button"
+                      onClick={confirmDeleteJob}
+                      className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

@@ -1,9 +1,10 @@
+// src/components/ProtectedRoute.js
 import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAppSelector } from "../hooks/redux";
+import { useSelector } from "react-redux";
 
 const ProtectedRoute = () => {
-  const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, isLoading } = useSelector((state) => state.auth);
   const location = useLocation();
 
   // Show loading spinner while checking authentication

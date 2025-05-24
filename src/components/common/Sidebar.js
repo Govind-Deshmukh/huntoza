@@ -1,16 +1,20 @@
+// src/components/common/Sidebar.js
 import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import { useData } from "../../context/DataContext";
+import { useSelector, useDispatch } from "react-redux";
+import { loadCurrentPlan } from "../../store/slices/plansSlice";
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
-  const { user } = useAuth();
-  const { currentPlan, loadCurrentPlan } = useData();
+  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
+  const { currentPlan } = useSelector((state) => state.plans);
 
   useEffect(() => {
-    loadCurrentPlan();
-  }, [user]);
+    if (user) {
+      dispatch(loadCurrentPlan());
+    }
+  }, [user, dispatch]);
 
   // Define navigation items
   const navItems = [

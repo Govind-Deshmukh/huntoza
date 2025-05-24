@@ -1,27 +1,37 @@
-import React, { useState } from "react";
+// src/pages/auth/LoginPage.js
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import AuthNavbar from "./AuthNavbar"; // Import the navbar
+import { useDispatch, useSelector } from "react-redux";
+import { login, clearError } from "../../store/slices/authSlice";
+import AuthNavbar from "./AuthNavbar";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login, error, isLoading, clearError } = useAuth();
+  const dispatch = useDispatch();
+  const { error, isLoading } = useSelector((state) => state.auth);
   const navigate = useNavigate();
   const location = useLocation();
 
   // Get the return path if redirected from a protected route
   const from = location.state?.from || "/dashboard";
 
+  // Clear error when component mounts or unmounts
+  useEffect(() => {
+    dispatch(clearError());
+    return () => dispatch(clearError());
+  }, [dispatch]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    clearError();
+    dispatch(clearError());
 
     try {
-      await login(email, password);
+      await dispatch(login({ email, password })).unwrap();
       navigate(from, { replace: true });
     } catch (err) {
-      // Error is handled in the AuthContext
+      // Error is handled in the Redux slice
+      console.error("Login error:", err);
     }
   };
 
