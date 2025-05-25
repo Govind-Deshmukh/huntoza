@@ -50,6 +50,45 @@ export const deleteJob = createAsyncThunk(
     }
   }
 );
+export const addInterview = createAsyncThunk(
+  "jobs/addInterview",
+  async ({ jobId, interviewData }, { rejectWithValue }) => {
+    try {
+      const job = await jobService.addInterview(jobId, interviewData);
+      return job;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
+
+export const updateInterview = createAsyncThunk(
+  "jobs/updateInterview",
+  async ({ jobId, interviewId, interviewData }, { rejectWithValue }) => {
+    try {
+      const job = await jobService.updateInterview(
+        jobId,
+        interviewId,
+        interviewData
+      );
+      return job;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
+
+export const deleteInterview = createAsyncThunk(
+  "jobs/deleteInterview",
+  async ({ jobId, interviewId }, { rejectWithValue }) => {
+    try {
+      const job = await jobService.deleteInterview(jobId, interviewId);
+      return job;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
 
 export const getJobById = createAsyncThunk(
   "jobs/getJobById",
@@ -187,6 +226,68 @@ const jobsSlice = createSlice({
         state.currentJob = action.payload;
       })
       .addCase(getJobById.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(addInterview.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(addInterview.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.jobs.findIndex(
+          (job) => job._id === action.payload._id
+        );
+        if (index !== -1) {
+          state.jobs[index] = action.payload;
+        }
+        if (state.currentJob && state.currentJob._id === action.payload._id) {
+          state.currentJob = action.payload;
+        }
+      })
+      .addCase(addInterview.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(updateInterview.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateInterview.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.jobs.findIndex(
+          (job) => job._id === action.payload._id
+        );
+        if (index !== -1) {
+          state.jobs[index] = action.payload;
+        }
+        if (state.currentJob && state.currentJob._id === action.payload._id) {
+          state.currentJob = action.payload;
+        }
+      })
+      .addCase(updateInterview.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(deleteInterview.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteInterview.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.jobs.findIndex(
+          (job) => job._id === action.payload._id
+        );
+        if (index !== -1) {
+          state.jobs[index] = action.payload;
+        }
+        if (state.currentJob && state.currentJob._id === action.payload._id) {
+          state.currentJob = action.payload;
+        }
+      })
+      .addCase(deleteInterview.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

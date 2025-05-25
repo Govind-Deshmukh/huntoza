@@ -10,7 +10,11 @@ export const register = async (userData) => {
 
 // Login user
 export const login = async (email, password) => {
-  const response = await api.post("/auth/login", { email, password });
+  const response = await api.post(
+    "/auth/login",
+    { email, password },
+    { withCredentials: true }
+  );
   // No need to handle tokens since they're in HTTP-only cookies
   return response.data;
 };
