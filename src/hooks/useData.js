@@ -1,17 +1,18 @@
-// src/context/DataContextRedux.js
-import React, { createContext, useContext, useCallback, useMemo } from "react";
+// src/hooks/useData.js
 import { useSelector, useDispatch } from "react-redux";
-import { useAuth } from "./AuthContext";
+import { useCallback } from "react";
 import AccessControl from "../utils/accessControl";
 
-// Import actions from Redux slices
+// Import actions from all relevant slices
 import {
   loadJobs,
   createJob,
   updateJob,
   deleteJob,
   getJobById,
-  updateJobStats,
+  addInterview,
+  updateInterview,
+  deleteInterview,
   clearError as clearJobsError,
 } from "../store/slices/jobsSlice";
 
@@ -46,7 +47,6 @@ import {
   createPaymentOrder,
   verifyPayment,
   clearError as clearPlansError,
-  clearPaymentOrder,
 } from "../store/slices/plansSlice";
 
 import {
@@ -54,53 +54,37 @@ import {
   clearError as clearAnalyticsError,
 } from "../store/slices/analyticsSlice";
 
-// Create context
-const DataContext = createContext();
+import { paymentService } from "../services";
 
-export const DataProvider = ({ children }) => {
+export const useData = () => {
   const dispatch = useDispatch();
-  const { isAuthenticated } = useAuth();
 
-  // Get data from Redux store
-  const {
-    jobs,
-    currentJob,
-    loading: jobsLoading,
-    error: jobsError,
-    pagination: jobsPagination,
-    stats: jobStats,
-  } = useSelector((state) => state.jobs);
+  // Get all relevant state from Redux store
+  const jobs = useSelector((state) => state.jobs.jobs);
+  const jobStats = useSelector((state) => state.jobs.stats);
+  const jobsPagination = useSelector((state) => state.jobs.pagination);
+  const jobsLoading = useSelector((state) => state.jobs.loading);
+  const jobsError = useSelector((state) => state.jobs.error);
 
-  const {
-    tasks,
-    currentTask,
-    loading: tasksLoading,
-    error: tasksError,
-    pagination: tasksPagination,
-    stats: taskStats,
-  } = useSelector((state) => state.tasks);
+  const tasks = useSelector((state) => state.tasks.tasks);
+  const taskStats = useSelector((state) => state.tasks.stats);
+  const tasksPagination = useSelector((state) => state.tasks.pagination);
+  const tasksLoading = useSelector((state) => state.tasks.loading);
+  const tasksError = useSelector((state) => state.tasks.error);
 
-  const {
-    contacts,
-    currentContact,
-    loading: contactsLoading,
-    error: contactsError,
-    pagination: contactsPagination,
-  } = useSelector((state) => state.contacts);
+  const contacts = useSelector((state) => state.contacts.contacts);
+  const contactsPagination = useSelector((state) => state.contacts.pagination);
+  const contactsLoading = useSelector((state) => state.contacts.loading);
+  const contactsError = useSelector((state) => state.contacts.error);
 
-  const {
-    plans,
-    currentPlan,
-    paymentOrder,
-    loading: plansLoading,
-    error: plansError,
-  } = useSelector((state) => state.plans);
+  const plans = useSelector((state) => state.plans.plans);
+  const currentPlan = useSelector((state) => state.plans.currentPlan);
+  const plansLoading = useSelector((state) => state.plans.loading);
+  const plansError = useSelector((state) => state.plans.error);
 
-  const {
-    dashboardData,
-    loading: analyticsLoading,
-    error: analyticsError,
-  } = useSelector((state) => state.analytics);
+  const dashboardData = useSelector((state) => state.analytics.dashboardData);
+  const analyticsLoading = useSelector((state) => state.analytics.loading);
+  const analyticsError = useSelector((state) => state.analytics.error);
 
   // Combined loading and error states
   const isLoading =
@@ -109,11 +93,13 @@ export const DataProvider = ({ children }) => {
     contactsLoading ||
     plansLoading ||
     analyticsLoading;
-
   const error =
     jobsError || tasksError || contactsError || plansError || analyticsError;
 
-  // Clear error - dispatches all clear error actions
+  // Create access control instance
+  const accessControl = new AccessControl(currentPlan);
+
+  // Clear all errors
   const clearError = useCallback(() => {
     dispatch(clearJobsError());
     dispatch(clearTasksError());
@@ -122,15 +108,8 @@ export const DataProvider = ({ children }) => {
     dispatch(clearAnalyticsError());
   }, [dispatch]);
 
-  // Initialize access control with current plan
-  const accessControl = useMemo(
-    () => new AccessControl(currentPlan),
-    [currentPlan]
-  );
-
-  // === DASHBOARD OPERATIONS ===
-  const loadDashboardDataHandler = useCallback(async () => {
-    if (!isAuthenticated) return;
+  // DASHBOARD OPERATIONS
+  const loadDashboardDataFunc = useCallback(async () => {
     try {
       const resultAction = await dispatch(loadDashboardData());
       return resultAction.payload;
@@ -138,10 +117,10 @@ export const DataProvider = ({ children }) => {
       console.error("Dashboard data error:", err);
       return null;
     }
-  }, [isAuthenticated, dispatch]);
+  }, [dispatch]);
 
-  // === PLANS OPERATIONS ===
-  const loadPlansHandler = useCallback(async () => {
+  // PLANS OPERATIONS
+  const loadPlansFunc = useCallback(async () => {
     try {
       const resultAction = await dispatch(loadPlans());
       return resultAction.payload;
@@ -151,8 +130,7 @@ export const DataProvider = ({ children }) => {
     }
   }, [dispatch]);
 
-  const loadCurrentPlanHandler = useCallback(async () => {
-    if (!isAuthenticated) return null;
+  const loadCurrentPlanFunc = useCallback(async () => {
     try {
       const resultAction = await dispatch(loadCurrentPlan());
       return resultAction.payload;
@@ -160,11 +138,10 @@ export const DataProvider = ({ children }) => {
       console.error("Load current plan error:", err);
       return null;
     }
-  }, [isAuthenticated, dispatch]);
+  }, [dispatch]);
 
-  const initiatePlanUpgradeHandler = useCallback(
+  const initiatePlanUpgradeFunc = useCallback(
     async (planId, billingType) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(
           initiatePlanUpgrade({ planId, billingType })
@@ -175,11 +152,10 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const cancelSubscriptionHandler = useCallback(async () => {
-    if (!isAuthenticated) return false;
+  const cancelSubscriptionFunc = useCallback(async () => {
     try {
       await dispatch(cancelSubscription());
       return true;
@@ -187,11 +163,10 @@ export const DataProvider = ({ children }) => {
       console.error("Cancel subscription error:", err);
       throw err;
     }
-  }, [isAuthenticated, dispatch]);
+  }, [dispatch]);
 
-  const createPaymentOrderHandler = useCallback(
+  const createPaymentOrderFunc = useCallback(
     async (planId, billingType) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(
           createPaymentOrder({ planId, billingType })
@@ -202,12 +177,11 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const verifyPaymentHandler = useCallback(
+  const verifyPaymentFunc = useCallback(
     async (paymentData) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(verifyPayment(paymentData));
         return resultAction.payload;
@@ -216,18 +190,22 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const getPaymentHistoryHandler = useCallback(async () => {
-    // This will need to be implemented in the paymentSlice if not already there
-    return [];
+  const getPaymentHistoryFunc = useCallback(async () => {
+    try {
+      const transactions = await paymentService.getPaymentHistory();
+      return transactions;
+    } catch (err) {
+      console.error("Payment history error:", err);
+      return [];
+    }
   }, []);
 
-  // === JOBS OPERATIONS ===
-  const loadJobsHandler = useCallback(
+  // JOBS OPERATIONS
+  const loadJobsFunc = useCallback(
     async (filters = {}, page = 1, limit = 10) => {
-      if (!isAuthenticated) return;
       try {
         const resultAction = await dispatch(loadJobs({ filters, page, limit }));
         return resultAction.payload;
@@ -236,12 +214,11 @@ export const DataProvider = ({ children }) => {
         return null;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const getJobByIdHandler = useCallback(
+  const getJobByIdFunc = useCallback(
     async (jobId) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(getJobById(jobId));
         return resultAction.payload;
@@ -250,14 +227,12 @@ export const DataProvider = ({ children }) => {
         return null;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const createJobHandler = useCallback(
+  const createJobFunc = useCallback(
     async (jobData) => {
-      if (!isAuthenticated) return null;
       try {
-        // Check if we can create a new job based on current plan
         const canCreate = accessControl.canCreateJobApplication(
           jobsPagination.totalItems
         );
@@ -274,18 +249,11 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [
-      isAuthenticated,
-      dispatch,
-      accessControl,
-      jobsPagination.totalItems,
-      currentPlan.plan.name,
-    ]
+    [dispatch, accessControl, jobsPagination.totalItems, currentPlan.plan.name]
   );
 
-  const updateJobHandler = useCallback(
+  const updateJobFunc = useCallback(
     async (jobId, jobData) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(updateJob({ jobId, jobData }));
         return resultAction.payload;
@@ -294,12 +262,11 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const deleteJobHandler = useCallback(
+  const deleteJobFunc = useCallback(
     async (jobId) => {
-      if (!isAuthenticated) return false;
       try {
         await dispatch(deleteJob(jobId));
         return true;
@@ -308,13 +275,57 @@ export const DataProvider = ({ children }) => {
         return false;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  // === TASKS OPERATIONS ===
-  const loadTasksHandler = useCallback(
+  const addInterviewFunc = useCallback(
+    async (jobId, interviewData) => {
+      try {
+        const resultAction = await dispatch(
+          addInterview({ jobId, interviewData })
+        );
+        return resultAction.payload;
+      } catch (err) {
+        console.error("Add interview error:", err);
+        throw err;
+      }
+    },
+    [dispatch]
+  );
+
+  const updateInterviewFunc = useCallback(
+    async (jobId, interviewId, interviewData) => {
+      try {
+        const resultAction = await dispatch(
+          updateInterview({ jobId, interviewId, interviewData })
+        );
+        return resultAction.payload;
+      } catch (err) {
+        console.error("Update interview error:", err);
+        throw err;
+      }
+    },
+    [dispatch]
+  );
+
+  const deleteInterviewFunc = useCallback(
+    async (jobId, interviewId) => {
+      try {
+        const resultAction = await dispatch(
+          deleteInterview({ jobId, interviewId })
+        );
+        return resultAction.payload;
+      } catch (err) {
+        console.error("Delete interview error:", err);
+        throw err;
+      }
+    },
+    [dispatch]
+  );
+
+  // TASKS OPERATIONS
+  const loadTasksFunc = useCallback(
     async (filters = {}, page = 1, limit = 10) => {
-      if (!isAuthenticated) return;
       try {
         const resultAction = await dispatch(
           loadTasks({ filters, page, limit })
@@ -325,12 +336,11 @@ export const DataProvider = ({ children }) => {
         return null;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const getTaskByIdHandler = useCallback(
+  const getTaskByIdFunc = useCallback(
     async (taskId) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(getTaskById(taskId));
         return resultAction.payload;
@@ -339,12 +349,11 @@ export const DataProvider = ({ children }) => {
         return null;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const createTaskHandler = useCallback(
+  const createTaskFunc = useCallback(
     async (taskData) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(createTask(taskData));
         return resultAction.payload;
@@ -353,12 +362,11 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const updateTaskHandler = useCallback(
+  const updateTaskFunc = useCallback(
     async (taskId, taskData) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(updateTask({ taskId, taskData }));
         return resultAction.payload;
@@ -367,12 +375,11 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const completeTaskHandler = useCallback(
+  const completeTaskFunc = useCallback(
     async (taskId) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(completeTask(taskId));
         return resultAction.payload;
@@ -381,12 +388,11 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const deleteTaskHandler = useCallback(
+  const deleteTaskFunc = useCallback(
     async (taskId) => {
-      if (!isAuthenticated) return false;
       try {
         await dispatch(deleteTask(taskId));
         return true;
@@ -395,13 +401,12 @@ export const DataProvider = ({ children }) => {
         return false;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  // === CONTACTS OPERATIONS ===
-  const loadContactsHandler = useCallback(
+  // CONTACTS OPERATIONS
+  const loadContactsFunc = useCallback(
     async (filters = {}, page = 1, limit = 10) => {
-      if (!isAuthenticated) return;
       try {
         const resultAction = await dispatch(
           loadContacts({ filters, page, limit })
@@ -412,12 +417,11 @@ export const DataProvider = ({ children }) => {
         return null;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const getContactByIdHandler = useCallback(
+  const getContactByIdFunc = useCallback(
     async (contactId) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(getContactById(contactId));
         return resultAction.payload;
@@ -426,14 +430,12 @@ export const DataProvider = ({ children }) => {
         return null;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const createContactHandler = useCallback(
+  const createContactFunc = useCallback(
     async (contactData) => {
-      if (!isAuthenticated) return null;
       try {
-        // Check if we can create a new contact based on current plan
         const canCreate = accessControl.canCreateContact(
           contactsPagination.totalItems
         );
@@ -451,7 +453,6 @@ export const DataProvider = ({ children }) => {
       }
     },
     [
-      isAuthenticated,
       dispatch,
       accessControl,
       contactsPagination.totalItems,
@@ -459,9 +460,8 @@ export const DataProvider = ({ children }) => {
     ]
   );
 
-  const updateContactHandler = useCallback(
+  const updateContactFunc = useCallback(
     async (contactId, contactData) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(
           updateContact({ contactId, contactData })
@@ -472,12 +472,11 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const deleteContactHandler = useCallback(
+  const deleteContactFunc = useCallback(
     async (contactId) => {
-      if (!isAuthenticated) return false;
       try {
         await dispatch(deleteContact(contactId));
         return true;
@@ -486,12 +485,11 @@ export const DataProvider = ({ children }) => {
         return false;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const toggleContactFavoriteHandler = useCallback(
+  const toggleContactFavoriteFunc = useCallback(
     async (contactId) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(toggleContactFavorite(contactId));
         return resultAction.payload;
@@ -500,12 +498,11 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const addInteractionHandler = useCallback(
+  const addInteractionFunc = useCallback(
     async (contactId, interactionData) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(
           addInteraction({ contactId, interactionData })
@@ -516,19 +513,14 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const updateInteractionHandler = useCallback(
+  const updateInteractionFunc = useCallback(
     async (contactId, interactionId, interactionData) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(
-          updateInteraction({
-            contactId,
-            interactionId,
-            interactionData,
-          })
+          updateInteraction({ contactId, interactionId, interactionData })
         );
         return resultAction.payload;
       } catch (err) {
@@ -536,18 +528,14 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  const deleteInteractionHandler = useCallback(
+  const deleteInteractionFunc = useCallback(
     async (contactId, interactionId) => {
-      if (!isAuthenticated) return null;
       try {
         const resultAction = await dispatch(
-          deleteInteraction({
-            contactId,
-            interactionId,
-          })
+          deleteInteraction({ contactId, interactionId })
         );
         return resultAction.payload;
       } catch (err) {
@@ -555,134 +543,68 @@ export const DataProvider = ({ children }) => {
         throw err;
       }
     },
-    [isAuthenticated, dispatch]
+    [dispatch]
   );
 
-  // Create a memoized context value
-  const contextValue = useMemo(
-    () => ({
-      // State values
-      jobs,
-      jobStats,
-      jobsPagination,
-      tasks,
-      taskStats,
-      tasksPagination,
-      contacts,
-      contactsPagination,
-      plans,
-      currentPlan,
-      dashboardData,
-      isLoading,
-      error,
-      accessControl,
+  return {
+    // State
+    jobs,
+    jobStats,
+    jobsPagination,
+    tasks,
+    taskStats,
+    tasksPagination,
+    contacts,
+    contactsPagination,
+    plans,
+    currentPlan,
+    dashboardData,
+    isLoading,
+    error,
+    accessControl,
 
-      // Methods
-      clearError,
+    // Methods
+    clearError,
 
-      // Dashboard operations
-      loadDashboardData: loadDashboardDataHandler,
+    // Dashboard operations
+    loadDashboardData: loadDashboardDataFunc,
 
-      // Plans operations
-      loadPlans: loadPlansHandler,
-      loadCurrentPlan: loadCurrentPlanHandler,
-      initiatePlanUpgrade: initiatePlanUpgradeHandler,
-      cancelSubscription: cancelSubscriptionHandler,
-      createPaymentOrder: createPaymentOrderHandler,
-      verifyPayment: verifyPaymentHandler,
-      getPaymentHistory: getPaymentHistoryHandler,
+    // Plans operations
+    loadPlans: loadPlansFunc,
+    loadCurrentPlan: loadCurrentPlanFunc,
+    initiatePlanUpgrade: initiatePlanUpgradeFunc,
+    cancelSubscription: cancelSubscriptionFunc,
+    createPaymentOrder: createPaymentOrderFunc,
+    verifyPayment: verifyPaymentFunc,
+    getPaymentHistory: getPaymentHistoryFunc,
 
-      // Jobs operations
-      loadJobs: loadJobsHandler,
-      getJobById: getJobByIdHandler,
-      createJob: createJobHandler,
-      updateJob: updateJobHandler,
-      deleteJob: deleteJobHandler,
+    // Jobs operations
+    loadJobs: loadJobsFunc,
+    getJobById: getJobByIdFunc,
+    createJob: createJobFunc,
+    updateJob: updateJobFunc,
+    deleteJob: deleteJobFunc,
+    addInterview: addInterviewFunc,
+    updateInterview: updateInterviewFunc,
+    deleteInterview: deleteInterviewFunc,
 
-      // Add methods for handling interviews if they exist in Redux slices
-      addInterview: async () => {},
-      updateInterview: async () => {},
-      deleteInterview: async () => {},
+    // Tasks operations
+    loadTasks: loadTasksFunc,
+    getTaskById: getTaskByIdFunc,
+    createTask: createTaskFunc,
+    updateTask: updateTaskFunc,
+    completeTask: completeTaskFunc,
+    deleteTask: deleteTaskFunc,
 
-      // Tasks operations
-      loadTasks: loadTasksHandler,
-      getTaskById: getTaskByIdHandler,
-      createTask: createTaskHandler,
-      updateTask: updateTaskHandler,
-      completeTask: completeTaskHandler,
-      deleteTask: deleteTaskHandler,
-
-      // Contacts operations
-      loadContacts: loadContactsHandler,
-      getContactById: getContactByIdHandler,
-      createContact: createContactHandler,
-      updateContact: updateContactHandler,
-      deleteContact: deleteContactHandler,
-      toggleContactFavorite: toggleContactFavoriteHandler,
-      addInteraction: addInteractionHandler,
-      updateInteraction: updateInteractionHandler,
-      deleteInteraction: deleteInteractionHandler,
-    }),
-    [
-      // Dependencies for memo
-      jobs,
-      jobStats,
-      jobsPagination,
-      tasks,
-      taskStats,
-      tasksPagination,
-      contacts,
-      contactsPagination,
-      plans,
-      currentPlan,
-      dashboardData,
-      isLoading,
-      error,
-      accessControl,
-      clearError,
-      loadDashboardDataHandler,
-      loadPlansHandler,
-      loadCurrentPlanHandler,
-      initiatePlanUpgradeHandler,
-      cancelSubscriptionHandler,
-      createPaymentOrderHandler,
-      verifyPaymentHandler,
-      getPaymentHistoryHandler,
-      loadJobsHandler,
-      getJobByIdHandler,
-      createJobHandler,
-      updateJobHandler,
-      deleteJobHandler,
-      loadTasksHandler,
-      getTaskByIdHandler,
-      createTaskHandler,
-      updateTaskHandler,
-      completeTaskHandler,
-      deleteTaskHandler,
-      loadContactsHandler,
-      getContactByIdHandler,
-      createContactHandler,
-      updateContactHandler,
-      deleteContactHandler,
-      toggleContactFavoriteHandler,
-      addInteractionHandler,
-      updateInteractionHandler,
-      deleteInteractionHandler,
-    ]
-  );
-
-  return (
-    <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>
-  );
+    // Contacts operations
+    loadContacts: loadContactsFunc,
+    getContactById: getContactByIdFunc,
+    createContact: createContactFunc,
+    updateContact: updateContactFunc,
+    deleteContact: deleteContactFunc,
+    toggleContactFavorite: toggleContactFavoriteFunc,
+    addInteraction: addInteractionFunc,
+    updateInteraction: updateInteractionFunc,
+    deleteInteraction: deleteInteractionFunc,
+  };
 };
-
-// Custom hook to use the data context
-export const useData = () => {
-  const context = useContext(DataContext);
-  if (!context) {
-    throw new Error("useData must be used within a DataProvider");
-  }
-  return context;
-};
-
-export default DataContext;
