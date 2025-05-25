@@ -4,63 +4,88 @@ class AccessControl {
     this.currentPlan = currentPlan || {
       plan: {
         name: "free",
-        limits: {},
+        limits: {
+          jobApplications: 10,
+          contacts: 20,
+          documentStorage: 5, // MB
+        },
       },
     };
   }
 
   // Check if user can create a new job application
   canCreateJobApplication(currentCount) {
-    // Get the limit from the plan
     const limit = this.currentPlan?.plan?.limits?.jobApplications;
 
-    // If limit is -1, it means unlimited
-    if (limit === -1) return true;
+    // If limit is -1 or no limit, unlimited applications are allowed
+    if (!limit || limit === -1) return true;
 
-    // If limit is not defined, default to free plan limit
-    const maxCount = limit || 5;
-
-    return currentCount < maxCount;
+    // Otherwise, check against the current count
+    return currentCount < limit;
   }
 
   // Check if user can create a new contact
   canCreateContact(currentCount) {
-    // Get the limit from the plan
     const limit = this.currentPlan?.plan?.limits?.contacts;
 
-    // If limit is -1, it means unlimited
-    if (limit === -1) return true;
+    // If limit is -1 or no limit, unlimited contacts are allowed
+    if (!limit || limit === -1) return true;
 
-    // If limit is not defined, default to free plan limit
-    const maxCount = limit || 10;
-
-    return currentCount < maxCount;
+    // Otherwise, check against the current count
+    return currentCount < limit;
   }
 
-  // Check if user can upload a document
-  canUploadDocument(currentSize, fileSize) {
-    // Get the limit from the plan in MB
+  // Check if user can upload a document with given size
+  canUploadDocument(sizeInMB, currentUsage) {
     const limit = this.currentPlan?.plan?.limits?.documentStorage;
 
-    // If limit is -1, it means unlimited
-    if (limit === -1) return true;
+    // If limit is -1 or no limit, unlimited storage is allowed
+    if (!limit || limit === -1) return true;
 
-    // If limit is not defined, default to free plan limit (5MB)
-    const maxSize = (limit || 5) * 1024 * 1024; // Convert MB to bytes
-
-    return currentSize + fileSize <= maxSize;
+    // Otherwise, check if the new document would exceed the limit
+    return currentUsage + sizeInMB <= limit;
   }
 
-  // Check if user can access analytics features
-  canAccessAnalytics() {
-    // Free plan users can't access advanced analytics
-    return this.currentPlan?.plan?.name !== "free";
+  // Check if user can access advanced analytics
+  canAccessAdvancedAnalytics() {
+    return this.currentPlan?.plan?.limits?.advancedAnalytics === true;
   }
 
-  // Check if user can create custom tags
-  canCreateCustomTags() {
-    // Only premium plans can create custom tags
-    return this.currentPlan?.plan?.name !== "free";
+  // Check if user can export data
+  canExportData() {
+    return this.currentPlan?.plan?.limits?.exportData === true;
+  }
+
+  // Check if user can create a public profile
+  canCreatePublicProfile() {
+    return this.currentPlan?.plan?.limits?.publicProfile === true;
+  }
+
+  // Get remaining job applications
+  getRemainingJobApplications(currentCount) {
+    const limit = this.currentPlan?.plan?.limits?.jobApplications;
+
+    if (!limit || limit === -1) return Infinity;
+
+    return Math.max(0, limit - currentCount);
+  }
+
+  // Get remaining contacts
+  getRemainingContacts(currentCount) {
+    const limit = this.currentPlan?.plan?.limits?.contacts;
+
+    if (!limit || limit === -1) return Infinity;
+
+    return Math.max(0, limit - currentCount);
+  }
+
+  // Get remaining storage space in MB
+  getRemainingStorage(currentUsage) {
+    const limit = this.currentPlan?.plan?.limits?.documentStorage;
+
+    if (!limit || limit === -1) return Infinity;
+
+    return Math.max(0, limit - currentUsage);
   }
 }
 
