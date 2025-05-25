@@ -93,6 +93,41 @@ export const addInteraction = createAsyncThunk(
   }
 );
 
+// Adding the missing action creators
+export const updateInteraction = createAsyncThunk(
+  "contacts/updateInteraction",
+  async (
+    { contactId, interactionId, interactionData },
+    { rejectWithValue }
+  ) => {
+    try {
+      const contact = await contactService.updateInteraction(
+        contactId,
+        interactionId,
+        interactionData
+      );
+      return contact;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
+
+export const deleteInteraction = createAsyncThunk(
+  "contacts/deleteInteraction",
+  async ({ contactId, interactionId }, { rejectWithValue }) => {
+    try {
+      const contact = await contactService.deleteInteraction(
+        contactId,
+        interactionId
+      );
+      return contact;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   contacts: [],
@@ -243,6 +278,57 @@ const contactsSlice = createSlice({
         ) {
           state.currentContact = action.payload;
         }
+      })
+
+      // Add the extra reducers for the new action creators
+      // Update interaction
+      .addCase(updateInteraction.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateInteraction.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.contacts.findIndex(
+          (contact) => contact._id === action.payload._id
+        );
+        if (index !== -1) {
+          state.contacts[index] = action.payload;
+        }
+        if (
+          state.currentContact &&
+          state.currentContact._id === action.payload._id
+        ) {
+          state.currentContact = action.payload;
+        }
+      })
+      .addCase(updateInteraction.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Delete interaction
+      .addCase(deleteInteraction.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteInteraction.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.contacts.findIndex(
+          (contact) => contact._id === action.payload._id
+        );
+        if (index !== -1) {
+          state.contacts[index] = action.payload;
+        }
+        if (
+          state.currentContact &&
+          state.currentContact._id === action.payload._id
+        ) {
+          state.currentContact = action.payload;
+        }
+      })
+      .addCase(deleteInteraction.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   },
 });

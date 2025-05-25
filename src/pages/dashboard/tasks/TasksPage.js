@@ -1,7 +1,7 @@
 // src/pages/dashboard/tasks/TasksPage.js
 import React, { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "../../../components/dashboard/DashboardLayout";
-import { useData } from "../../../context/DataContext";
+import { useData } from "../../../hooks/useData"; // Changed import path
 import TasksHeader from "../../../components/dashboard/tasks/TasksHeader";
 import TasksFilters from "../../../components/dashboard/tasks/TasksFilters";
 import TasksList from "../../../components/dashboard/tasks/TasksList";
