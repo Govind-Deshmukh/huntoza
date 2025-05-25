@@ -5,7 +5,7 @@ import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import ErrorAlert from "../../components/common/ErrorAlert";
 import { useAuth } from "../../context/AuthContext"; // Auth from Context API
-import { useData } from "../../hooks/useData"; // Data from Redux
+import { useReduxData } from "../../hooks/useData"; // Data from Redux
 
 const DashboardPage = () => {
   // Get user from Auth Context
@@ -21,7 +21,7 @@ const DashboardPage = () => {
     dashboardData,
     isLoading,
     error,
-  } = useData();
+  } = useReduxData();
 
   useEffect(() => {
     // Load dashboard analytics data

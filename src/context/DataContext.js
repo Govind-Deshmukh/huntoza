@@ -1,14 +1,26 @@
-// src/context/DataContext.js
-// This file exists solely for backward compatibility and is a bridge to the Redux implementation
-// It exports the useData hook for components that still import from this file
+// src/context/DataContext.js - Bridge to Redux
+import React, { createContext, useContext } from "react";
+import { useReduxData } from "../hooks/useData";
 
-import { useData } from "../hooks/useData";
+// Create a context that will now serve as a bridge to Redux
+const DataContext = createContext(null);
 
-// Create an empty context object for compatibility
-const DataContext = {
-  Provider: ({ children }) => children,
+// This provider will now use the Redux store via the useData hook
+export const DataProvider = ({ children }) => {
+  const dataFromRedux = useReduxData();
+
+  return (
+    <DataContext.Provider value={dataFromRedux}>
+      {children}
+    </DataContext.Provider>
+  );
 };
 
-// Export both the context (for compatibility) and the hook
-export { DataContext, useData };
-export default DataContext;
+// This hook will remain for backward compatibility
+export const useData = () => {
+  const context = useContext(DataContext);
+  if (!context) {
+    throw new Error("useData must be used within a DataProvider");
+  }
+  return context;
+};

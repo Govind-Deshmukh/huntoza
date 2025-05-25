@@ -1,18 +1,22 @@
+// src/utils/axiosConfig.js
 import axios from "axios";
+import { refreshToken } from "../services/authService";
 
-// Base API configuration
+// Create axios instance with base URL from environment
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000/api",
+  baseURL: process.env.REACT_APP_API_URL,
+  withCredentials: true, // Important for cookies
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, // Important for cookies
 });
 
-// Create a global refresh token mechanism WITHOUT directly importing AuthContext
+// Variable to track if refresh token request is in progress
 let isRefreshing = false;
+// Queue of failed requests to retry after token refresh
 let failedQueue = [];
 
+// Process failed queue (after token refresh)
 const processQueue = (error, token = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
@@ -25,19 +29,57 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Response interceptor
+// Request interceptor - not needed for HTTP-only cookies approach
+// but can be used for additional headers
+api.interceptors.request.use(
+  (config) => {
+    // You could add additional headers here if needed
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for handling token refresh
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
-    // If the error is not 401 or it's already been retried, reject
-    if (error.response?.status !== 401 || originalRequest._retry) {
-      return Promise.reject(error);
-    }
+    // If error is 401 and not a retry of a token refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // If refresh token endpoint returned 401, we can't refresh
+      if (originalRequest.url === "/auth/refresh-token") {
+        return Promise.reject(error);
+      }
 
-    // If the token is being refreshed, add the request to the queue
-    if (isRefreshing) {
+      // Mark this request as retried
+      originalRequest._retry = true;
+
+      // If not already refreshing, start refresh
+      if (!isRefreshing) {
+        isRefreshing = true;
+
+        try {
+          // Try to refresh the token
+          await refreshToken();
+
+          // If successful, process the queue and retry the original request
+          processQueue(null);
+          isRefreshing = false;
+          return api(originalRequest);
+        } catch (refreshError) {
+          // If refresh fails, process the queue with error
+          processQueue(refreshError);
+          isRefreshing = false;
+          return Promise.reject(refreshError);
+        }
+      }
+
+      // If already refreshing, add to queue
       return new Promise((resolve, reject) => {
         failedQueue.push({ resolve, reject });
       })
@@ -49,24 +91,8 @@ api.interceptors.response.use(
         });
     }
 
-    originalRequest._retry = true;
-    isRefreshing = true;
-
-    // Try to refresh the token
-    try {
-      await api.post("/auth/refresh-token");
-      isRefreshing = false;
-      processQueue(null);
-      return api(originalRequest);
-    } catch (refreshError) {
-      isRefreshing = false;
-      processQueue(refreshError);
-
-      // Dispatch logout action using custom event
-      window.dispatchEvent(new CustomEvent("auth:sessionExpired"));
-
-      return Promise.reject(refreshError);
-    }
+    // For other errors, just reject
+    return Promise.reject(error);
   }
 );
 

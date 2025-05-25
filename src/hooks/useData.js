@@ -61,7 +61,7 @@ import { paymentService } from "../services";
  * This hook handles all data operations (jobs, tasks, contacts, plans)
  * but does NOT handle authentication (use useAuth for that)
  */
-export const useData = () => {
+export const useReduxData = () => {
   const dispatch = useDispatch();
 
   // Get all relevant state from Redux store

@@ -1,7 +1,12 @@
 // src/pages/dashboard/tasks/TasksPage.js
 import React, { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "../../../components/dashboard/DashboardLayout";
-import { useData } from "../../../hooks/useData"; // Changed import path
+import { useDispatch, useSelector } from "react-redux";
+import {
+  loadTasks,
+  completeTask,
+  deleteTask,
+} from "../../../store/slices/tasksSlice";
 import TasksHeader from "../../../components/dashboard/tasks/TasksHeader";
 import TasksFilters from "../../../components/dashboard/tasks/TasksFilters";
 import TasksList from "../../../components/dashboard/tasks/TasksList";
@@ -11,15 +16,13 @@ import LoadingSpinner from "../../../components/common/LoadingSpinner";
 import ErrorAlert from "../../../components/common/ErrorAlert";
 
 const TasksPage = () => {
-  const {
-    tasks,
-    tasksPagination,
-    isLoading,
-    error,
-    loadTasks,
-    completeTask,
-    deleteTask,
-  } = useData();
+  const dispatch = useDispatch();
+
+  // Get state from Redux store
+  const tasks = useSelector((state) => state.tasks.tasks);
+  const pagination = useSelector((state) => state.tasks.pagination);
+  const isLoading = useSelector((state) => state.tasks.loading);
+  const error = useSelector((state) => state.tasks.error);
 
   // State for filtering and sorting
   const [filters, setFilters] = useState({
@@ -36,8 +39,8 @@ const TasksPage = () => {
 
   // Load tasks with defined callback to prevent infinite loop
   const fetchTasks = useCallback(() => {
-    loadTasks(filters, currentPage);
-  }, [loadTasks, filters, currentPage]);
+    dispatch(loadTasks({ filters, page: currentPage }));
+  }, [dispatch, filters, currentPage]);
 
   // Load tasks on component mount and when filters or page changes
   useEffect(() => {
@@ -54,7 +57,7 @@ const TasksPage = () => {
   // Handle task completion
   const handleCompleteTask = async (taskId) => {
     try {
-      await completeTask(taskId);
+      await dispatch(completeTask(taskId)).unwrap();
     } catch (err) {
       console.error("Error completing task:", err);
     }
@@ -64,7 +67,7 @@ const TasksPage = () => {
   const handleDeleteTask = async (taskId) => {
     if (window.confirm("Are you sure you want to delete this task?")) {
       try {
-        await deleteTask(taskId);
+        await dispatch(deleteTask(taskId)).unwrap();
       } catch (err) {
         console.error("Error deleting task:", err);
       }
@@ -157,11 +160,11 @@ const TasksPage = () => {
                 getPriorityBadge={getPriorityBadge}
               />
 
-              {tasksPagination.numOfPages > 1 && (
+              {pagination.totalPages > 1 && (
                 <Pagination
                   currentPage={currentPage}
-                  totalPages={tasksPagination.numOfPages}
-                  totalItems={tasksPagination.totalItems}
+                  totalPages={pagination.totalPages}
+                  totalItems={pagination.totalItems}
                   itemsPerPage={tasks.length}
                   onPageChange={setCurrentPage}
                 />
