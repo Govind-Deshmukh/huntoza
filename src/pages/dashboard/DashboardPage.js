@@ -1,48 +1,38 @@
 // src/pages/dashboard/DashboardPage.js
 import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import ErrorAlert from "../../components/common/ErrorAlert";
-import { loadDashboardData } from "../../store/slices/analyticsSlice";
-import { loadJobs } from "../../store/slices/jobsSlice";
-import { loadTasks } from "../../store/slices/tasksSlice";
+import { useAuth } from "../../context/AuthContext"; // Auth from Context API
+import { useData } from "../../hooks/useData"; // Data from Redux
 
 const DashboardPage = () => {
-  const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  // Get user from Auth Context
+  const { user } = useAuth();
+
+  // Get data from Redux via useData hook
   const {
+    loadDashboardData,
+    loadJobs,
+    loadTasks,
+    jobs,
+    tasks,
     dashboardData,
-    loading: analyticsLoading,
-    error: analyticsError,
-  } = useSelector((state) => state.analytics);
-  const { jobs } = useSelector((state) => state.jobs);
-  const { tasks } = useSelector((state) => state.tasks);
-  const isLoading = analyticsLoading;
+    isLoading,
+    error,
+  } = useData();
 
   useEffect(() => {
     // Load dashboard analytics data
-    dispatch(loadDashboardData());
+    loadDashboardData();
 
     // Load recent jobs with limit
-    dispatch(
-      loadJobs({
-        filters: { sort: "newest" },
-        page: 1,
-        limit: 4,
-      })
-    );
+    loadJobs({ sort: "newest" }, 1, 4);
 
     // Load upcoming tasks with custom filters
-    dispatch(
-      loadTasks({
-        filters: { status: "pending", sort: "dueDate-asc" },
-        page: 1,
-        limit: 3,
-      })
-    );
-  }, [dispatch]);
+    loadTasks({ status: "pending", sort: "dueDate-asc" }, 1, 3);
+  }, [loadDashboardData, loadJobs, loadTasks]);
 
   // Generate status badge with appropriate color
   const getStatusBadge = (status) => {
@@ -236,7 +226,7 @@ const DashboardPage = () => {
           </p>
         </div>
 
-        {analyticsError && <ErrorAlert message={analyticsError} />}
+        {error && <ErrorAlert message={error} />}
 
         {/* Stats cards */}
         {isLoading ? (
@@ -305,7 +295,7 @@ const DashboardPage = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {jobs.length > 0 ? (
+                        {jobs && jobs.length > 0 ? (
                           jobs.map((job) => (
                             <tr key={job._id}>
                               <td className="px-4 py-3 whitespace-nowrap">
@@ -362,7 +352,7 @@ const DashboardPage = () => {
                 </div>
                 <div className="p-4">
                   <ul className="divide-y divide-gray-200">
-                    {tasks.length > 0 ? (
+                    {tasks && tasks.length > 0 ? (
                       tasks.map((task) => (
                         <li key={task._id} className="py-3">
                           <div className="flex items-start">

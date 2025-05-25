@@ -1,5 +1,6 @@
 // src/store/index.js
 import { configureStore } from "@reduxjs/toolkit";
+import { useDispatch, useSelector } from "react-redux";
 import authSlice from "./slices/authSlice";
 import jobsSlice from "./slices/jobsSlice";
 import tasksSlice from "./slices/tasksSlice";
@@ -21,8 +22,16 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
+        // Ignore non-serializable values like Date objects in state
         ignoredActions: ["persist/PERSIST"],
       },
     }),
   devTools: process.env.NODE_ENV !== "production",
 });
+
+// Create a custom hook for simpler store access
+export const useAppSelector = (selector) => {
+  return useSelector(selector);
+};
+
+export const useAppDispatch = () => useDispatch();

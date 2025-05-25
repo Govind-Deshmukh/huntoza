@@ -1,6 +1,6 @@
 // src/hooks/useData.js
-import { useSelector, useDispatch } from "react-redux";
 import { useCallback } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import AccessControl from "../utils/accessControl";
 
 // Import actions from all relevant slices
@@ -56,6 +56,11 @@ import {
 
 import { paymentService } from "../services";
 
+/**
+ * Custom hook to access and manage application data through Redux
+ * This hook handles all data operations (jobs, tasks, contacts, plans)
+ * but does NOT handle authentication (use useAuth for that)
+ */
 export const useData = () => {
   const dispatch = useDispatch();
 
@@ -93,10 +98,11 @@ export const useData = () => {
     contactsLoading ||
     plansLoading ||
     analyticsLoading;
+
   const error =
     jobsError || tasksError || contactsError || plansError || analyticsError;
 
-  // Create access control instance
+  // Create access control instance for subscription/plan limits
   const accessControl = new AccessControl(currentPlan);
 
   // Clear all errors

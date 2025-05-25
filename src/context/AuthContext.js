@@ -1,3 +1,4 @@
+// src/context/AuthContext.js
 import React, {
   createContext,
   useState,
@@ -5,20 +6,24 @@ import React, {
   useContext,
   useCallback,
 } from "react";
+import { useDispatch } from "react-redux";
 import * as authService from "../services/authService";
 import {
   showSuccessToast,
   showErrorToast,
   handleApiError,
 } from "../utils/toastUtils";
+import { handleSessionExpiration as reduxHandleSessionExpiration } from "../store/slices/authSlice";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true); // Start with loading to check for existing session
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const dispatch = useDispatch();
 
   // Clear error
   const clearError = useCallback(() => setError(null), []);
@@ -235,8 +240,9 @@ export const AuthProvider = ({ children }) => {
   const handleSessionExpiration = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
+    dispatch(reduxHandleSessionExpiration());
     showErrorToast("Your session has expired. Please log in again.");
-  }, []);
+  }, [dispatch]);
 
   // Context value
   const contextValue = {

@@ -1,18 +1,33 @@
+// src/App.js
 import React from "react";
-import { BrowserRouter } from "react-router-dom";
-import ReduxStoreProvider from "./store/ReduxStoreProvider";
+import { BrowserRouter as Router } from "react-router-dom";
+import { Provider } from "react-redux";
+import { store } from "./store";
 import { AuthProvider } from "./context/AuthContext";
-import AppRoutes from "./routes"; // Assuming you have a routes component
+import AppRoutes from "./routes";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function App() {
   return (
-    <BrowserRouter>
-      <ReduxStoreProvider>
-        <AuthProvider>
+    <Provider store={store}>
+      <AuthProvider>
+        <Router>
           <AppRoutes />
-        </AuthProvider>
-      </ReduxStoreProvider>
-    </BrowserRouter>
+          <ToastContainer
+            position="top-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+          />
+        </Router>
+      </AuthProvider>
+    </Provider>
   );
 }
 
